@@ -14,10 +14,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        768,
-        192
+        -2320,
+        672
       ],
-      "id": "50dd0e54-e17b-4b6e-938c-d2c680ca65c4",
+      "id": "849e8a3a-7522-46f6-a828-47c0e84ed0ec",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -35,24 +35,100 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        1840,
-        0
+        -1248,
+        480
       ],
-      "id": "13c43934-1fc0-4640-a655-8ed5f5b8ef94",
+      "id": "86ccbf3c-6984-44b5-bc44-97d53ef4392d",
       "name": "Memory Manager"
     },
     {
       "parameters": {
-        "jsCode": "// Get data from the trigger\nconst contextId = $('When Executed by Another Workflow').item.json.context_id;\nconst userMessage = $('When Executed by Another Workflow').item.json.userMessage;\nconst assistantResponse = $('When Executed by Another Workflow').item.json.assistantResponse;\n\n// Get memory analysis from the previous node (Memory Manager)\nconst memoryOutput = $input.item.json.output;\n\n// Parse old context from trigger - with better error handling\nlet context = { recent_messages: [], long_term_memories: [] };\nconst contextData = $('When Executed by Another Workflow').item.json.context;\n\nif (contextData) {\n  try {\n    // If it's already an object, use it directly\n    if (typeof contextData === 'object') {\n      context = contextData;\n    } else if (typeof contextData === 'string') {\n      // Only try to parse if it's a non-empty string\n      const trimmed = contextData.trim();\n      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {\n        context = JSON.parse(trimmed);\n      }\n    }\n  } catch (e) {\n    console.log('Error parsing context, using empty context:', e.message);\n    // Keep the default empty context\n  }\n}\n\n// Parse memory decision\nlet memoryUpdate = { should_update: false, new_memories: [], remove_indices: [] };\ntry {\n  const cleaned = memoryOutput.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('No memory update');\n}\n\n// Add messages (keep last 10)\ncontext.recent_messages.push(\n  { role: 'user', content: userMessage },\n  { role: 'assistant', content: assistantResponse }\n);\nif (context.recent_messages.length > 10) {\n  context.recent_messages = context.recent_messages.slice(-10);\n}\n\n// Update memories\nif (memoryUpdate.should_update && memoryUpdate.new_memories) {\n  context.long_term_memories.push(...memoryUpdate.new_memories);\n}\n\nreturn {\n  json: {\n    context_id: contextId,\n    context: JSON.stringify(context)\n  }\n};"
+        "jsCode": "// Configuration for context rebuilding\nconst MAX_MESSAGES = 20; // total entries (user + assistant)\nconst MAX_CHAR_COUNT = 100000; // hard ceiling for combined character count\nconst SUMMARY_SUFFIX = ' ... [truncated]';\n\n// Gather latest interaction data\nconst contextId = $('When Executed by Another Workflow').item.json.context_id;\n\n// Memory manager output\nconst memoryOutput = $input.item.json.output;\n\n// Parse prior context safely\nlet context = { recent_messages: [], long_term_memories: [] };\nconst contextData = $('When Executed by Another Workflow').item.json.context;\n\nif (contextData) {\n  try {\n    if (typeof contextData === 'object') {\n      context = contextData;\n    } else if (typeof contextData === 'string') {\n      const trimmed = contextData.trim();\n      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {\n        context = JSON.parse(trimmed);\n      }\n    }\n  } catch (e) {\n    console.log('Error parsing context, using empty context:', e.message);\n  }\n}\n\nif (!Array.isArray(context.recent_messages)) {\n  context.recent_messages = [];\n} else {\n  context.recent_messages = context.recent_messages\n    .filter((entry) => entry && typeof entry === 'object')\n    .map((entry) => ({\n      role: entry.role || 'assistant',\n      content: typeof entry.content === 'string' ? entry.content : ''\n    }));\n}\n\nif (!Array.isArray(context.long_term_memories)) {\n  context.long_term_memories = [];\n}\n\nconst transcriptItems = $items('Fetch Transcript') || [];\nconst transcripts = transcriptItems\n  .map((item) => item.json || {})\n  .filter((entry) => entry && (!entry.context_id || entry.context_id === contextId))\n  .sort((a, b) => {\n    const toTimestamp = (value) => {\n      if (!value) {\n        return 0;\n      }\n      const parsed = Date.parse(value);\n      if (!Number.isNaN(parsed)) {\n        return parsed;\n      }\n      const numeric = Number(value);\n      return Number.isFinite(numeric) ? numeric : 0;\n    };\n    const aTime = toTimestamp(a.createdAt ?? a.created_at ?? a.updatedAt ?? a.updated_at);\n    const bTime = toTimestamp(b.createdAt ?? b.created_at ?? b.updatedAt ?? b.updated_at);\n    return bTime - aTime;\n  });\n\nconst rebuiltMessages = [];\nlet totalChars = 0;\nlet stopAdding = false;\n\nconst addMessage = (role, originalContent) => {\n  if (stopAdding || rebuiltMessages.length >= MAX_MESSAGES) {\n    stopAdding = true;\n    return;\n  }\n\n  let content = typeof originalContent === 'string' ? originalContent.trim() : '';\n  if (!content) {\n    return;\n  }\n\n  let summaryAttempted = false;\n\n  while (true) {\n    if (totalChars + content.length <= MAX_CHAR_COUNT) {\n      rebuiltMessages.push({ role, content });\n      totalChars += content.length;\n      return;\n    }\n\n    if (summaryAttempted) {\n      stopAdding = true;\n      return;\n    }\n\n    summaryAttempted = true;\n    const available = MAX_CHAR_COUNT - totalChars;\n    if (available <= SUMMARY_SUFFIX.length) {\n      stopAdding = true;\n      return;\n    }\n\n    const sliceLength = Math.max(available - SUMMARY_SUFFIX.length, 0);\n    content = `${content.slice(0, sliceLength)}${SUMMARY_SUFFIX}`;\n  }\n};\n\nif (transcripts.length > 0) {\n  for (const entry of transcripts) {\n    if (stopAdding || rebuiltMessages.length >= MAX_MESSAGES) {\n      break;\n    }\n    const role = entry.role === 'assistant' ? 'assistant' : 'user';\n    addMessage(role, entry.message);\n  }\n} else if (context.recent_messages.length > 0) {\n  // Fall back to existing context if no transcript rows are available\n  for (const entry of context.recent_messages.slice(-MAX_MESSAGES)) {\n    addMessage(entry.role === 'assistant' ? 'assistant' : 'user', entry.content);\n  }\n}\n\ncontext.recent_messages = rebuiltMessages.reverse();\n\n// Update long-term memory decisions\nlet memoryUpdate = { should_update: false, new_memories: [], remove_indices: [] };\ntry {\n  const cleaned = memoryOutput.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('No memory update');\n}\n\nif (memoryUpdate.should_update && Array.isArray(memoryUpdate.new_memories)) {\n  context.long_term_memories.push(...memoryUpdate.new_memories);\n}\n\nreturn {\n  json: {\n    context_id: contextId,\n    context: JSON.stringify(context)\n  }\n};\r\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2160,
-        0
+        -336,
+        672
       ],
-      "id": "97e13467-eb2b-4195-950e-5f3ae418a7eb",
+      "id": "245c4c4a-b18f-4c03-906b-5ac42f215e07",
       "name": "Build Next Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare transcript rows for the latest exchange\nconst contextId = $('When Executed by Another Workflow').item.json.context_id;\nconst userMessage = $('When Executed by Another Workflow').item.json.userMessage;\nconst assistantResponse = $('When Executed by Another Workflow').item.json.assistantResponse;\n\nconst items = [];\n\nif (typeof userMessage === 'string' && userMessage.trim()) {\n  items.push({\n    json: {\n      context_id: contextId,\n      role: 'user',\n      message: userMessage\n    }\n  });\n}\n\nif (typeof assistantResponse === 'string' && assistantResponse.trim()) {\n  items.push({\n    json: {\n      context_id: contextId,\n      role: 'assistant',\n      message: assistantResponse\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        672
+      ],
+      "id": "4e39bf82-c092-4038-ae14-0eb4fb0a6575",
+      "name": "Prepare Transcript Rows"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "0GV2sxO6KBloUxpq",
+          "mode": "list",
+          "cachedResultName": "ura_dev_chat_transcript",
+          "cachedResultUrl": "/projects/wzADSex6JcQgm6C6/datatables/0GV2sxO6KBloUxpq"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $json.context_id }}",
+            "role": "={{ $json.role }}",
+            "message": "={{ $json.message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        672
+      ],
+      "id": "465ec3b5-2a4b-4b0a-a168-c568d73b490c",
+      "name": "Insert Transcript Rows"
     },
     {
       "parameters": {
@@ -103,15 +179,16 @@
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
-        }
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        2352,
-        0
+        -160,
+        672
       ],
-      "id": "a4d2e7e8-7cfe-434e-a0ae-4ea8ceeffffc",
+      "id": "a4046272-96d9-4e31-8a57-635b282b5fcd",
       "name": "Upsert row(s)"
     },
     {
@@ -123,10 +200,10 @@
       "type": "@n8n/n8n-nodes-langchain.chat",
       "typeVersion": 1,
       "position": [
-        1120,
-        0
+        -1968,
+        480
       ],
-      "id": "60cfb93b-0a7b-488b-9604-a1f217de2169",
+      "id": "000a5866-ce15-4435-978a-f97bb897e12d",
       "name": "Respond to Chat"
     },
     {
@@ -140,10 +217,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        768,
-        0
+        -2320,
+        480
       ],
-      "id": "9f2ef875-22ae-4d77-868d-9b25c5c932a7",
+      "id": "2aacc87f-207c-4a0e-aee0-571b944a1d54",
       "name": "Response Agent"
     },
     {
@@ -159,10 +236,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        1840,
-        192
+        -1248,
+        672
       ],
-      "id": "b31a5f79-21aa-46f9-8359-443e79f8416d",
+      "id": "c17b7218-cf6b-45f6-a8a9-7653107a6237",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -194,10 +271,10 @@
       "type": "n8n-nodes-base.dataTable",
       "typeVersion": 1,
       "position": [
-        560,
-        0
+        -2528,
+        480
       ],
-      "id": "ccce69cd-7e5a-4564-9b4a-d9bbb9561e42",
+      "id": "e5799cf5-e945-4d92-8777-4d926de22672",
       "name": "Get Context",
       "alwaysOutputData": true
     },
@@ -210,10 +287,10 @@
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.3,
       "position": [
-        -240,
-        0
+        -3328,
+        480
       ],
-      "id": "50b96742-d822-4b90-bce6-2f740c40e398",
+      "id": "f4236760-3f63-49d8-a11c-8171a7c961db",
       "name": "Chat Trigger",
       "webhookId": "1e3dcdcd-0b5a-4d6d-bae3-3cb8de788b90"
     },
@@ -225,10 +302,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        1648,
-        0
+        -1440,
+        480
       ],
-      "id": "6fa8c384-8eb9-4460-bcf0-23acdc50cd43",
+      "id": "e1d757d7-75af-4e83-87bb-01929f905b7d",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -300,24 +377,24 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1344,
-        0
+        -1744,
+        480
       ],
-      "id": "86a2649c-5210-481a-b2af-dc72b72097fa",
+      "id": "6b316f7e-a0ce-4455-872d-25852880ff6a",
       "name": "Call 'Memory Chat Bot'"
     },
     {
       "parameters": {
-        "content": "Make memory Manager smarter and remove \"Build Next Context\"\n\nLog chats and memory for the future when we have better consolidation\n\nAdd the context nodes and add context ID as key \n\nAnd finally port this to Supabase",
-        "height": 304
+        "content": "Make memory Manager smarter and remove \"Build Next Context\"\n\nLog chats and memory for the future when we have better consolidation\n\nAdd the context nodes and add context ID as key \n\nLog conversations. For each message pair check is it part of the previous conversation? Then update the summary of that conversation, a maximum of 2 sentences. If not, start a new conversation.\n\nAnd finally port this to Supabase",
+        "height": 416
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        2016,
-        -368
+        -1120,
+        64
       ],
       "typeVersion": 1,
-      "id": "4e298bf8-9246-40d1-ba7b-3b149b17825e",
+      "id": "3c3505aa-9d41-4a85-a3c5-6354acfee97a",
       "name": "Sticky Note"
     },
     {
@@ -343,10 +420,10 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        144,
-        0
+        -2944,
+        480
       ],
-      "id": "6606bb7f-0cfd-4fe9-ba90-9026e8e8d2a2",
+      "id": "176d6486-8c0c-468e-b7df-c4da7b6c04a2",
       "name": "Context Keys"
     },
     {
@@ -405,13 +482,13 @@
         },
         "options": {}
       },
-      "id": "41080c10-ccfe-4a1c-8104-065d753adc29",
+      "id": "02cfaf95-aa2b-4c0d-ad3b-31ef1417b08e",
       "name": "Base Context",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -48,
-        0
+        -3136,
+        480
       ]
     },
     {
@@ -421,11 +498,32 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        352,
-        0
+        -2736,
+        480
       ],
-      "id": "a1cca98d-40ad-4e5d-8e95-2d971cd83bd3",
+      "id": "3562a045-8eb2-41c2-93dc-ebda72b2c645",
       "name": "deleteme"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "0GV2sxO6KBloUxpq",
+          "mode": "list",
+          "cachedResultName": "ura_dev_chat_transcript",
+          "cachedResultUrl": "/projects/wzADSex6JcQgm6C6/datatables/0GV2sxO6KBloUxpq"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        672
+      ],
+      "id": "53b72429-a019-4bcb-860a-fe35ddaf6a2e",
+      "name": "Fetch Transcript"
     }
   ],
   "pinData": {},
@@ -445,7 +543,7 @@
       "main": [
         [
           {
-            "node": "Build Next Context",
+            "node": "Prepare Transcript Rows",
             "type": "main",
             "index": 0
           }
@@ -457,6 +555,17 @@
         [
           {
             "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Transcript Rows": {
+      "main": [
+        [
+          {
+            "node": "Insert Transcript Rows",
             "type": "main",
             "index": 0
           }
@@ -561,13 +670,35 @@
           }
         ]
       ]
+    },
+    "Insert Transcript Rows": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Next Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "32ef00b7-6ee7-442a-a566-1a619fe92996",
+  "versionId": "3a540c94-0308-44f0-b1a7-0699e3bc453e",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
