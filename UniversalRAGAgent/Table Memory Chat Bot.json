@@ -1,0 +1,577 @@
+{
+  "name": "Table Memory Chat Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        192
+      ],
+      "id": "50dd0e54-e17b-4b6e-938c-d2c680ca65c4",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze if this conversation contains information worth remembering long-term.\n\nCurrent context:\n={{ $json.context }}\n\nLatest exchange:\nUser: {{ $json.userMessage }}\nAssistant: {{ $json.assistantResponse }}\n\nRespond with ONLY valid JSON:\n{\"should_update\": true, \"new_memories\": [{\"type\": \"preference\", \"content\": \"User likes pizza\"}], \"remove_indices\": []}\n\nOnly create memories for important lasting information (preferences, facts, goals). Not for casual greetings.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1840,
+        0
+      ],
+      "id": "13c43934-1fc0-4640-a655-8ed5f5b8ef94",
+      "name": "Memory Manager"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data from the trigger\nconst contextId = $('When Executed by Another Workflow').item.json.context_id;\nconst userMessage = $('When Executed by Another Workflow').item.json.userMessage;\nconst assistantResponse = $('When Executed by Another Workflow').item.json.assistantResponse;\n\n// Get memory analysis from the previous node (Memory Manager)\nconst memoryOutput = $input.item.json.output;\n\n// Parse old context from trigger - with better error handling\nlet context = { recent_messages: [], long_term_memories: [] };\nconst contextData = $('When Executed by Another Workflow').item.json.context;\n\nif (contextData) {\n  try {\n    // If it's already an object, use it directly\n    if (typeof contextData === 'object') {\n      context = contextData;\n    } else if (typeof contextData === 'string') {\n      // Only try to parse if it's a non-empty string\n      const trimmed = contextData.trim();\n      if (trimmed && trimmed !== 'null' && trimmed !== 'undefined') {\n        context = JSON.parse(trimmed);\n      }\n    }\n  } catch (e) {\n    console.log('Error parsing context, using empty context:', e.message);\n    // Keep the default empty context\n  }\n}\n\n// Parse memory decision\nlet memoryUpdate = { should_update: false, new_memories: [], remove_indices: [] };\ntry {\n  const cleaned = memoryOutput.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('No memory update');\n}\n\n// Add messages (keep last 10)\ncontext.recent_messages.push(\n  { role: 'user', content: userMessage },\n  { role: 'assistant', content: assistantResponse }\n);\nif (context.recent_messages.length > 10) {\n  context.recent_messages = context.recent_messages.slice(-10);\n}\n\n// Update memories\nif (memoryUpdate.should_update && memoryUpdate.new_memories) {\n  context.long_term_memories.push(...memoryUpdate.new_memories);\n}\n\nreturn {\n  json: {\n    context_id: contextId,\n    context: JSON.stringify(context)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "id": "97e13467-eb2b-4195-950e-5f3ae418a7eb",
+      "name": "Build Next Context"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LK2ds2NsZAyQx8nk",
+          "mode": "list",
+          "cachedResultName": "ura_dev_chat_contexts",
+          "cachedResultUrl": "/projects/wzADSex6JcQgm6C6/datatables/LK2ds2NsZAyQx8nk"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "context_id",
+              "keyValue": "={{ $json.context_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context": "={{ $json.context }}",
+            "context_id": "={{ $json.context_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        0
+      ],
+      "id": "a4d2e7e8-7cfe-434e-a0ae-4ea8ceeffffc",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "60cfb93b-0a7b-488b-9604-a1f217de2169",
+      "name": "Respond to Chat"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Base Context').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=You are a helpful assistant.\n\nConversation context (JSON):\n{{ $('Get Context').item.json.context || '{\"recent_messages\":[],\"long_term_memories\":[]}' }}\n\nThe context contains:\n- recent_messages: previous conversation turns with this user\n- long_term_memories: important facts, preferences, and goals about the user\n\nUse this information naturally when responding. Don't mention that you're reading from context"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        0
+      ],
+      "id": "9f2ef875-22ae-4d77-868d-9b25c5c932a7",
+      "name": "Response Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1840,
+        192
+      ],
+      "id": "b31a5f79-21aa-46f9-8359-443e79f8416d",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LK2ds2NsZAyQx8nk",
+          "mode": "list",
+          "cachedResultName": "ura_dev_chat_contexts",
+          "cachedResultUrl": "/projects/wzADSex6JcQgm6C6/datatables/LK2ds2NsZAyQx8nk"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "context",
+              "keyValue": "={{ $('Chat Trigger').item.json.sessionId || 'default' }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        560,
+        0
+      ],
+      "id": "ccce69cd-7e5a-4564-9b4a-d9bbb9561e42",
+      "name": "Get Context",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "50b96742-d822-4b90-bce6-2f740c40e398",
+      "name": "Chat Trigger",
+      "webhookId": "1e3dcdcd-0b5a-4d6d-bae3-3cb8de788b90"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great! Fishing is a wonderful hobby...\",\n  \"context\": \"{\\\"recent_messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello\\\"},{\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"hi there\\\"}],\\\"long_term_memories\\\":[{\\\"type\\\":\\\"preference\\\",\\\"content\\\":\\\"User likes fishing\\\"}]}\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        0
+      ],
+      "id": "6fa8c384-8eb9-4460-bcf0-23acdc50cd43",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "tbFBssvM3gwTuKvo",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/tbFBssvM3gwTuKvo"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "userMessage": "={{ $('Chat Trigger').item.json.chatInput }}",
+            "assistantResponse": "={{ $('Response Agent').item.json.output }}",
+            "context": "={{ $('Get Context').item.json.context || '{\"recent_messages\":[],\"long_term_memories\":[]}' }}",
+            "context_id": "={{ $('Context Keys').item.json.context_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "userMessage",
+              "displayName": "userMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "assistantResponse",
+              "displayName": "assistantResponse",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "86a2649c-5210-481a-b2af-dc72b72097fa",
+      "name": "Call 'Memory Chat Bot'"
+    },
+    {
+      "parameters": {
+        "content": "Make memory Manager smarter and remove \"Build Next Context\"\n\nLog chats and memory for the future when we have better consolidation\n\nAdd the context nodes and add context ID as key \n\nAnd finally port this to Supabase",
+        "height": 304
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2016,
+        -368
+      ],
+      "typeVersion": 1,
+      "id": "4e298bf8-9246-40d1-ba7b-3b149b17825e",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b57aaebc-00b6-49d5-8a4f-90ecb9246d97",
+              "name": "context_id",
+              "value": "={{ $json.userid }}",
+              "type": "string"
+            },
+            {
+              "id": "588a1a2e-a5aa-4c7d-82d5-239a3cee5721",
+              "name": "table_prefix",
+              "value": "={{ $json.appname }}_{{ $json.environment }}_",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        0
+      ],
+      "id": "6606bb7f-0cfd-4fe9-ba90-9026e8e8d2a2",
+      "name": "Context Keys"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9a9a245e-f1a1-4282-bb02-a81ffe629f0f",
+              "name": "chatInput",
+              "value": "={{ $json.chatInput || $json.message?.text || $json.body?.chatInput || $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "b80831d8-c653-4203-8706-adedfdb98f77",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            },
+            {
+              "id": "b84118bf-d789-499b-87e7-f8d3b601cec8",
+              "name": "tenant",
+              "value": "=",
+              "type": "string"
+            },
+            {
+              "id": "bdacb505-6584-4518-95e8-7d5e7c20f020",
+              "name": "environment",
+              "value": "=dev",
+              "type": "string"
+            },
+            {
+              "id": "6b9472fb-1541-4684-97ec-d358fe048aad",
+              "name": "userid",
+              "value": "=  michaelfY0bPv0HuPsz",
+              "type": "string"
+            },
+            {
+              "id": "669003c6-cc8f-4641-a58b-39a5b5306d4c",
+              "name": "appname",
+              "value": "ura",
+              "type": "string"
+            },
+            {
+              "id": "29013846-2214-4d3b-ae9e-226bb27da2c6",
+              "name": "persona",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "8c10376c-c743-4213-82a8-0bc661e2a79e",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41080c10-ccfe-4a1c-8104-065d753adc29",
+      "name": "Base Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -48,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        352,
+        0
+      ],
+      "id": "a1cca98d-40ad-4e5d-8e95-2d971cd83bd3",
+      "name": "deleteme"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Response Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory Manager": {
+      "main": [
+        [
+          {
+            "node": "Build Next Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Next Context": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Chat": {
+      "main": [
+        [
+          {
+            "node": "Call 'Memory Chat Bot'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Context": {
+      "main": [
+        [
+          {
+            "node": "Response Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Base Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Keys": {
+      "main": [
+        [
+          {
+            "node": "deleteme",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base Context": {
+      "main": [
+        [
+          {
+            "node": "Context Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deleteme": {
+      "main": [
+        [
+          {
+            "node": "Get Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "32ef00b7-6ee7-442a-a566-1a619fe92996",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
+  },
+  "id": "tbFBssvM3gwTuKvo",
+  "tags": []
+}
