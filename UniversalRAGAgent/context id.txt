@@ -1,0 +1,69 @@
+{
+  "name": "Context Builder",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b2c3d4e5-f6g7-8901-bcde-f23456789012",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [-220, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "tenant", "value": "lotus" },
+            { "name": "app", "value": "lifepilot" },
+            { "name": "env", "value": "prod" },
+            { "name": "channel", "value": "webchat" },
+            { "name": "persona", "value": "adviser" },
+            { "name": "schema_version", "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c3d4e5f6-g7h8-9012-cdef-345678901234",
+      "name": "Set Defaults",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [0, -120]
+    },
+    {
+      "parameters": {
+        "language": "javascript",
+        "jsCode": "function isNullish(v){return v===undefined||v===null||v==='';}\nconst defaults=$node[\"Set Defaults\"].json||{};\nconst input=$json||{};\nconst tenant=input.tenant??defaults.tenant??'lotus';\nconst app=input.app??defaults.app??'lifepilot';\nconst env=input.env??defaults.env??'prod';\nconst channel=input.channel??defaults.channel??'webchat';\nconst persona=input.persona??defaults.persona??'adviser';\nconst v=input.schema_version??defaults.schema_version??'1';\nconst incomingUser=input.user_id;\nconst incomingSess=input.session_id;\nconst clientCookie=input.client_cookie??'';\nconst userAgent=input.user_agent??'';\nconst crypto=require('crypto');\nfunction hash16(s){return crypto.createHash('sha256').update(String(s)).digest('hex').slice(0,16);}\nconst userPart=!isNullish(incomingUser)?`u=${incomingUser}`:`u=anon-${hash16(clientCookie+'|'+userAgent)}`;\nconst sessionPart=!isNullish(incomingUser)?'s=global':(!isNullish(incomingSess)?`s=${incomingSess}`:'s=ephemeral');\nconst base=`ctx:${tenant}::${app}::${env}`;\nconst tail=`::${userPart}::${sessionPart}::ch=${channel}::p=${persona}::v=${v}`;\nconst context_id=`${base}${tail}`;\nconst user_global_ns=`${base}::${userPart}::s=global::ch=${channel}::p=${persona}::v=${v}`;\nconst session_ns=`${base}::${userPart}::${!isNullish(incomingSess)?`s=${incomingSess}`:'s=ephemeral'}::ch=${channel}::p=${persona}::v=${v}`;\nconst org_global_ns=`${base}::u=any::s=global::ch=${channel}::p=${persona}::v=${v}`;\nconst short_user=userPart.replace('u=','');\nconst short_sess=sessionPart.replace('s=','');\nreturn [{json:{...input,context_id,user_global_ns,session_ns,org_global_ns,user_id_effective:short_user,session_id_effective:short_sess,tenant,app,env,channel,persona,schema_version:v}}];",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Build Keys",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Defaults",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Defaults": {
+      "main": [
+        [
+          {
+            "node": "Build Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

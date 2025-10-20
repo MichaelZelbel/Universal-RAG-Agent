@@ -1,0 +1,425 @@
+{
+  "name": "Table Memory Chat Bot Process",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze if this conversation contains information worth remembering long-term.\n\nCurrent context:\n={{ $json.context }}\n\nLatest exchange:\nUser: {{ $json.userMessage }}\nAssistant: {{ $json.assistantResponse }}\n\nRespond with ONLY valid JSON:\n{\"should_update\": true, \"new_memories\": [{\"type\": \"preference\", \"content\": \"User likes pizza\"}], \"remove_indices\": []}\n\nOnly create memories for important lasting information (preferences, facts, goals). Not for casual greetings.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -1824,
+        160
+      ],
+      "id": "589613cc-98ba-4b58-bed5-096e8ec10c28",
+      "name": "Memory Manager"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run Once for All Items\n\n// Inputs\nconst trigger = $('Start').first().json || {};\nconst allRows = $input.all().map(i => i.json || {});\n\n// Filter to this context_id (defensive), then oldest->newest\nconst rows = allRows\n  .filter(r => !r.context_id || String(r.context_id) === String(trigger.context_id))\n  .sort((a, b) => {\n    const ts = v => Date.parse(v || '') || 0;\n    return ts(a.created_at || a.createdAt) - ts(b.created_at || b.createdAt);\n  });\n\n// Convert rows to context.recent_messages\n// ENHANCEMENT: Now includes 'id' and 'was_truncated' fields for message retrieval\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  \n  return {\n    id: r.id,  // Database ID - allows agent to retrieve full message if needed\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original  // True if original message is in DB\n  };\n});\n\n// Keep any existing long-term memories if provided as JSON string\nlet long_term_memories = [];\ntry {\n  if (trigger.context && typeof trigger.context === 'string') {\n    const parsed = JSON.parse(trigger.context);\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  } else if (trigger.context && typeof trigger.context === 'object' &&\n             Array.isArray(trigger.context.long_term_memories)) {\n    long_term_memories = trigger.context.long_term_memories;\n  }\n} catch { /* ignore */ }\n\nconst context = { recent_messages, long_term_memories };\n\nreturn [\n  {\n    json: {\n      context_id: String(trigger.context_id || ''),\n      context: JSON.stringify(context),\n      userMessage: String(trigger.userMessage ?? ''),\n      assistantResponse: String(trigger.assistantResponse ?? '')\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        160
+      ],
+      "id": "f35ff671-5daf-426c-a7ab-27bcfbadb4b3",
+      "name": "Build Next Context"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuration\nconst MESSAGE_LENGTH_THRESHOLD = 5000;\nconst TRUNCATE_LENGTH = 1000;\nconst TRUNCATION_SUFFIX = '... [truncated] Message Summary: ';\n\n// Get input data from trigger\nconst triggerData = $('Start').first().json;\nconst contextId = triggerData.context_id;\nconst userMessage = triggerData.userMessage;\nconst assistantResponse = triggerData.assistantResponse;\nconst tablePrefix = triggerData.table_prefix;\nconst contextStr = triggerData.context;\n\n// Process user message\nlet userItem = null;\nif (typeof userMessage === 'string' && userMessage.trim()) {\n  const originalMessage = userMessage.trim();\n  const messageLength = originalMessage.length;\n  \n  userItem = {\n    context_id: contextId,\n    table_prefix: tablePrefix,\n    context: contextStr,\n    role: 'user',\n    message_original: originalMessage,\n    needs_summary: messageLength > MESSAGE_LENGTH_THRESHOLD,\n    truncated_message: messageLength > MESSAGE_LENGTH_THRESHOLD \n      ? originalMessage.substring(0, TRUNCATE_LENGTH) + TRUNCATION_SUFFIX\n      : null,\n    message: messageLength <= MESSAGE_LENGTH_THRESHOLD ? originalMessage : null\n  };\n}\n\n// Process assistant message\nlet assistantItem = null;\nif (typeof assistantResponse === 'string' && assistantResponse.trim()) {\n  const originalMessage = assistantResponse.trim();\n  const messageLength = originalMessage.length;\n  \n  assistantItem = {\n    context_id: contextId,\n    table_prefix: tablePrefix,\n    context: contextStr,\n    role: 'assistant',\n    message_original: originalMessage,\n    needs_summary: messageLength > MESSAGE_LENGTH_THRESHOLD,\n    truncated_message: messageLength > MESSAGE_LENGTH_THRESHOLD \n      ? originalMessage.substring(0, TRUNCATE_LENGTH) + TRUNCATION_SUFFIX\n      : null,\n    message: messageLength <= MESSAGE_LENGTH_THRESHOLD ? originalMessage : null\n  };\n}\n\n// Return items for processing\nconst items = [];\nif (userItem) items.push({ json: userItem });\nif (assistantItem) items.push({ json: assistantItem });\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1472,
+        160
+      ],
+      "id": "112bbf62-10b7-48bc-8bad-2cc8c24802c0",
+      "name": "Prepare Messages"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.needs_summary }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        160
+      ],
+      "id": "1fd5c349-6c7d-4444-90b6-efda93a9ff6d",
+      "name": "Check If Summary Needed"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a concise summary of the following message. The summary MUST be 1000 characters or less. Focus on the key points and main ideas.\n\nOriginal message:\n{{ $json.message_original }}\n\nProvide ONLY the summary text, no additional formatting or explanation.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -1056,
+        -32
+      ],
+      "id": "7394659d-de89-4b5d-a928-f1c2743efe69",
+      "name": "Summarize Long Message"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === Combine Message with Summary (per item) ===\n\n// Direct agent summary from previous node\nconst summary = String($input.item?.json?.output ?? '').trim();\n\n// Nearby items on the same branch (if present)\nconst paired = (name) => { try { return ($item(name, 0)?.json ?? {}); } catch { return {}; } };\nconst cur    = $json ?? {};\nconst merged = paired('Merge Messages');            // rename if needed\nconst prep   = paired('Prepare Transcript Rows');   // rename if needed\n\n// Role: from the current item first\nconst role = String(cur.role ?? merged.role ?? prep.role ?? 'user').trim();\n\n// Trigger payload (never used for role, only as last-resort text)\nconst trigger = $('Start').first().json || {};\nconst triggerMessage =\n  role === 'assistant'\n    ? String(trigger.assistantResponse ?? '')\n    : String(trigger.userMessage ?? '');\n\n// Original message: current item -> nearby items -> trigger (role-aware)\nconst originalRaw =\n  cur.message_original ?? cur.message ??\n  merged.message_original ?? merged.message ??\n  prep.message_original ?? prep.message ??\n  triggerMessage;\n\nconst original = String(originalRaw ?? '').trim();\n\n// Minimal required meta\nconst context_id   = String(cur.context_id   ?? merged.context_id   ?? prep.context_id   ?? trigger.context_id ?? '');\nconst table_prefix = String(cur.table_prefix ?? merged.table_prefix ?? prep.table_prefix ?? trigger.table_prefix ?? '');\nconst context      = (cur.context ?? merged.context ?? prep.context ?? trigger.context ?? null);\n\n// Build combined message\nconst MAX = 1000;\nconst SUFFIX = ' ... [truncated] Message Summary: ';\nconst finalMessage = original.slice(0, MAX) + SUFFIX + summary;\n\n// Output with message_original populated\nreturn {\n  json: {\n    context_id,\n    table_prefix,\n    context,\n    role,\n    message_original: original,\n    message: finalMessage,\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        -32
+      ],
+      "id": "3e01df24-613e-4aa0-8a74-b908cdf1ef69",
+      "name": "Combine Message with Summary"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Message doesn't need summary, use original as-is\n// Pass through all context data\nreturn {\n  json: {\n    context_id: $json.context_id,\n    table_prefix: $json.table_prefix,\n    context: $json.context,\n    role: $json.role,\n    message_original: $json.message_original,\n    message: $json.message\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -752,
+        176
+      ],
+      "id": "788ebd19-2b52-4434-b213-8c7b5e02d072",
+      "name": "Use Original Message"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        -544,
+        160
+      ],
+      "id": "2fcc4c23-5d21-4903-9f3f-c7c358f04576",
+      "name": "Merge Messages"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1824,
+        352
+      ],
+      "id": "f2bf9ed0-4ba4-4f9a-bce5-95eb3bb3d56d",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1056,
+        112
+      ],
+      "id": "7ef0c6ff-e1e7-4541-99e3-43ab3a5a22fd",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great! Fishing is a wonderful hobby...\",\n  \"context\": \"{\\\"recent_messages\\\":[{\\\"id\\\":1,\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello\\\",\\\"was_truncated\\\":false},{\\\"id\\\":2,\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"hi there\\\",\\\"was_truncated\\\":false}],\\\"long_term_memories\\\":[{\\\"type\\\":\\\"preference\\\",\\\"content\\\":\\\"User likes fishing\\\"}]}\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2032,
+        160
+      ],
+      "id": "ba319ba3-287e-4b09-b163-c50433ad57db",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Fixed Message Processing:\n- Messages > 5000 chars get truncated + AI summary\n- Original stored in message_original\n- Processed version in message column\n- Context data properly passed through all nodes\n- Fixed item pairing issues after merge\n\nENHANCEMENT:\n- Each message in context now includes database ID\n- Added 'was_truncated' flag to indicate if full message is in DB\n- Agent can retrieve original messages using ID when needed",
+        "height": 240,
+        "width": 350
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1472,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "2059c0dd-71a3-4364-9e33-2a515764cd96",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}chat_transcript\n(context_id, role, message, message_original) VALUES (\n  '{{ String( $('Start').first().json.context_id).replace(/'/g, \"''\") }}',\n  '{{ String($json.role).replace(/'/g, \"''\") }}',\n  '{{ String($json.message).replace(/'/g, \"''\") }}',\n  '{{ String($json.message_original).replace(/'/g, \"''\") }}'\n);\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -352,
+        160
+      ],
+      "id": "ede34b9f-fbc8-4cad-872d-a78cd7373827",
+      "name": "Insert Transcript",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  id, context_id, role, message, message_original, created_at, updated_at\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\nORDER BY created_at DESC\nLIMIT 20;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -144,
+        160
+      ],
+      "id": "c0d6cfce-4319-4816-a224-3b89f4a6f967",
+      "name": "Fetch Transcript",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}chat_contexts\n(context_id, context)\nVALUES (\n  '{{ $json.context_id }}',\n  COALESCE(\n    NULLIF($$\n      {{ typeof $json.context === 'string'\n          ? $json.context\n          : JSON.stringify($json.context || {}) }}\n    $$, '')::jsonb,\n    '{}'::jsonb\n  )\n)\nON CONFLICT (context_id) DO UPDATE SET\n  context    = EXCLUDED.context,\n  \"updated_at\" = timezone('utc'::text, now());\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        224,
+        160
+      ],
+      "id": "af48e8c5-1a75-4c0c-8259-071444ce457f",
+      "name": "Upsert Context",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Memory Manager": {
+      "main": [
+        [
+          {
+            "node": "Prepare Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize Long Message",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Messages": {
+      "main": [
+        [
+          {
+            "node": "Check If Summary Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Summary Needed": {
+      "main": [
+        [
+          {
+            "node": "Summarize Long Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Original Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Long Message": {
+      "main": [
+        [
+          {
+            "node": "Combine Message with Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Message with Summary": {
+      "main": [
+        [
+          {
+            "node": "Merge Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Original Message": {
+      "main": [
+        [
+          {
+            "node": "Merge Messages",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Messages": {
+      "main": [
+        [
+          {
+            "node": "Insert Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Next Context": {
+      "main": [
+        [
+          {
+            "node": "Upsert Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Transcript": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Next Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5a70ac6c-445c-43e5-a716-770202a72132",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
+  },
+  "id": "e7XF3f8ZZCeSZyw0",
+  "tags": []
+}

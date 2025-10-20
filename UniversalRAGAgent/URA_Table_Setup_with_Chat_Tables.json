@@ -1,0 +1,265 @@
+{
+  "name": "URA Table Setup",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b57aaebc-00b6-49d5-8a4f-90ecb9246d97",
+              "name": "context_id",
+              "value": "={{ $json.userid }}{{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "588a1a2e-a5aa-4c7d-82d5-239a3cee5721",
+              "name": "table_prefix",
+              "value": "={{ $json.appname }}_{{ $json.environment }}_",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        -256
+      ],
+      "id": "ab0e43fc-ebd9-439d-85f0-96699499fad8",
+      "name": "Context Keys"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9a9a245e-f1a1-4282-bb02-a81ffe629f0f",
+              "name": "chatInput",
+              "value": "={{ $json.chatInput || $json.message?.text || $json.body?.chatInput || $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "b80831d8-c653-4203-8706-adedfdb98f77",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            },
+            {
+              "id": "b84118bf-d789-499b-87e7-f8d3b601cec8",
+              "name": "tenant",
+              "value": "=",
+              "type": "string"
+            },
+            {
+              "id": "bdacb505-6584-4518-95e8-7d5e7c20f020",
+              "name": "environment",
+              "value": "=dev",
+              "type": "string"
+            },
+            {
+              "id": "6b9472fb-1541-4684-97ec-d358fe048aad",
+              "name": "userid",
+              "value": "=  michael543525",
+              "type": "string"
+            },
+            {
+              "id": "669003c6-cc8f-4641-a58b-39a5b5306d4c",
+              "name": "appname",
+              "value": "ura",
+              "type": "string"
+            },
+            {
+              "id": "29013846-2214-4d3b-ae9e-226bb27da2c6",
+              "name": "persona",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "8c10376c-c743-4213-82a8-0bc661e2a79e",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0e8afaf0-12be-4f7b-a825-5397ca7dd054",
+      "name": "Base Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        -256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Uncommented: Enable the pgvector extension to work with embedding vectors\n-- create extension vector;\n\n-- Create a table to store your documents\ncreate table {{ $('Context Keys').item.json.table_prefix }}documents (\n  id bigserial primary key,\n  content text, -- corresponds to Document.pageContent\n  metadata jsonb, -- corresponds to Document.metadata\n  embedding vector(1536) -- 1536 works for OpenAI embeddings, change if needed\n);\n\n-- Create a function to search for documents\ncreate function match_{{ $('Context Keys').item.json.table_prefix }}documents (\n  query_embedding vector(1536),\n  match_count int default null,\n  filter jsonb DEFAULT '{}'\n) returns table (\n  id bigint,\n  content text,\n  metadata jsonb,\n  similarity float\n)\nlanguage plpgsql\nas $$\n#variable_conflict use_column\nbegin\n  return query\n  select\n    id,\n    content,\n    metadata,\n    1 - ({{ $('Context Keys').item.json.table_prefix }}documents.embedding <=> query_embedding) as similarity\n  from {{ $('Context Keys').item.json.table_prefix }}documents\n  where metadata @> filter\n  order by {{ $('Context Keys').item.json.table_prefix }}documents.embedding <=> query_embedding\n  limit match_count;\nend;\n$$;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1104,
+        -256
+      ],
+      "id": "49b52f26-e1dc-4a8b-9e6c-97e919e6a003",
+      "name": "Create Documents Table and Match Function",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE {{ $('Context Keys').item.json.table_prefix }}document_metadata (\n    id TEXT PRIMARY KEY,\n    title TEXT,\n    url TEXT,\n    created_at TIMESTAMP DEFAULT NOW(),\n    schema TEXT\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1328,
+        -256
+      ],
+      "id": "df64a489-91c8-4d24-9bb0-992d012e3696",
+      "name": "Create Document Metadata Table",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE {{ $('Context Keys').item.json.table_prefix }}document_rows (\n    id SERIAL PRIMARY KEY,\n    dataset_id TEXT REFERENCES {{ $('Context Keys').item.json.table_prefix }}document_metadata(id),\n    row_data JSONB  -- Store the actual row data\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1552,
+        -256
+      ],
+      "id": "b5e2e687-d8ec-47b3-b898-72354ce0fa58",
+      "name": "Create Document Rows Table (for Tabular Data)",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE {{ $('Context Keys').item.json.table_prefix }}chat_contexts (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT UNIQUE,\n  context JSONB,\n  createdAt TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updatedAt TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nCREATE OR REPLACE FUNCTION update_updatedAt_{{ $('Context Keys').item.json.table_prefix }}chat_contexts()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updatedAt\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_contexts\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_contexts\nFOR EACH ROW\nEXECUTE FUNCTION update_updatedAt_{{ $('Context Keys').item.json.table_prefix }}chat_contexts();\n\nCREATE TABLE {{ $('Context Keys').item.json.table_prefix }}chat_transcript (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT NOT NULL,\n  role TEXT,\n  message TEXT,\n  createdAt TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updatedAt TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  CONSTRAINT fk_context FOREIGN KEY (context_id)\n    REFERENCES {{ $('Context Keys').item.json.table_prefix }}chat_contexts (context_id)\n    ON UPDATE CASCADE\n    ON DELETE CASCADE\n);\n\nCREATE OR REPLACE FUNCTION update_updatedAt_{{ $('Context Keys').item.json.table_prefix }}chat_transcript()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updatedAt\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_transcript\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript\nFOR EACH ROW\nEXECUTE FUNCTION update_updatedAt_{{ $('Context Keys').item.json.table_prefix }}chat_transcript();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1760,
+        -256
+      ],
+      "id": "fb7c28b4-7ae8-4a45-b5c8-1e4a7f1de2a1",
+      "name": "Create Chat Context & Transcript Tables",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Memory Data Table \nIf applicable, create a memory data table in n8n\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1616,
+        -512
+      ],
+      "typeVersion": 1,
+      "id": "49a855cb-7276-4062-b742-b78c28763c1d",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Base Context": {
+      "main": [
+        [
+          {
+            "node": "Context Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Keys": {
+      "main": [
+        [
+          {
+            "node": "Create Documents Table and Match Function",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Documents Table and Match Function": {
+      "main": [
+        [
+          {
+            "node": "Create Document Metadata Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Metadata Table": {
+      "main": [
+        [
+          {
+            "node": "Create Document Rows Table (for Tabular Data)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Rows Table (for Tabular Data)": {
+      "main": [
+        [
+          {
+            "node": "Create Chat Context & Transcript Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "599dab75-a55d-463f-8d53-5ee40c7ab306",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
+  },
+  "id": "TtrsCpHgm1dw7q0a",
+  "tags": []
+}
