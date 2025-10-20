@@ -10,10 +10,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -1216,
-        -32
+        -320,
+        64
       ],
-      "id": "00d700ce-d8f9-4aa9-99a2-07e45e82f219",
+      "id": "370096bf-949e-4211-a6f4-52a0990cc99b",
       "name": "Memory Manager"
     },
     {
@@ -23,10 +23,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        848,
-        -128
+        1744,
+        -32
       ],
-      "id": "498b0d83-bfd9-465c-8ef8-2ba7a473735d",
+      "id": "51bc5108-6662-4f2c-ab0f-6c3f3577b140",
       "name": "Build Next Context"
     },
     {
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -864,
-        -32
+        32,
+        64
       ],
-      "id": "229ab77b-1f25-420c-b7fa-0851d743593b",
+      "id": "6e6b4ee6-c241-46d4-8028-f5eb51113b77",
       "name": "Prepare Messages"
     },
     {
@@ -56,10 +56,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -656,
-        -32
+        240,
+        64
       ],
-      "id": "646bbcd3-a214-4d8e-a489-dcd912d010df",
+      "id": "d9882c35-a80e-4a3d-8cb4-6f5b15185dcd",
       "name": "Check If Summary Needed"
     },
     {
@@ -71,10 +71,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -448,
-        -224
+        448,
+        -128
       ],
-      "id": "03d3c375-1d11-4291-8c7d-42dccc206cd0",
+      "id": "f9b21764-e802-4516-bfa3-4d99b89d5fc1",
       "name": "Summarize Long Message"
     },
     {
@@ -84,10 +84,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -144,
-        -224
+        752,
+        -128
       ],
-      "id": "cc349b75-0ae0-42b2-94d3-7c383af7a17e",
+      "id": "0d3becb1-cbbc-43e1-a8a6-e2e7f5187ce6",
       "name": "Combine Message with Summary"
     },
     {
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -144,
-        -16
+        752,
+        80
       ],
-      "id": "19961328-3964-41e1-8040-cbfdf2ccfcef",
+      "id": "84b7804d-6cb9-459a-81dc-13a37430b13c",
       "name": "Use Original Message"
     },
     {
@@ -109,10 +109,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        64,
-        -32
+        960,
+        64
       ],
-      "id": "9c9879ed-cd2a-4e1c-ac16-3abf02ec6f1e",
+      "id": "1fe4c289-bbc2-4fcf-949c-ba39e12efc97",
       "name": "Merge Messages"
     },
     {
@@ -128,10 +128,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -1216,
-        176
+        -320,
+        272
       ],
-      "id": "d24cf6a5-bb78-4095-aa1e-06e7494b3679",
+      "id": "701dac4d-7259-4564-976c-b48335263fa5",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -153,10 +153,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -448,
-        -80
+        448,
+        16
       ],
-      "id": "f99d3c3b-6e5b-4e5e-9ce1-0c7e81c24f28",
+      "id": "78df2e68-7148-4d84-a6e8-201e8e420edc",
       "name": "OpenAI Chat Model2",
       "credentials": {
         "openAiApi": {
@@ -173,10 +173,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -1424,
-        -32
+        -528,
+        64
       ],
-      "id": "e6e1d43d-5b4c-49e5-8d3b-9ccee973c6fc",
+      "id": "b7875201-90ad-466f-a2a6-f0ebd0a5fdaf",
       "name": "Start"
     },
     {
@@ -187,11 +187,11 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -864,
-        -352
+        32,
+        -256
       ],
       "typeVersion": 1,
-      "id": "e31e0125-241b-4525-a1e3-0f259dc3a23c",
+      "id": "5bad7416-fdbd-401b-b546-f45f6be1745c",
       "name": "Sticky Note"
     },
     {
@@ -203,10 +203,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        256,
-        -32
+        1152,
+        64
       ],
-      "id": "b9c4b0e0-826a-4220-a684-18838d4f3d52",
+      "id": "949d5a80-edfc-41ed-94cc-ee70915ddf4b",
       "name": "Insert Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -225,10 +225,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        448,
-        -128
+        1344,
+        -32
       ],
-      "id": "87ec937c-3155-4a0c-be53-2c8089b97ab7",
+      "id": "ba71b7cc-899c-45a2-8b54-a76c2a097776",
       "name": "Fetch Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -247,10 +247,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        656,
-        -128
+        1552,
+        -32
       ],
-      "id": "1207d185-f26c-4cda-a560-dc728577b0c4",
+      "id": "1e814607-d69d-4374-9f2c-fc970f2443b4",
       "name": "Fetch Topic Summaries",
       "alwaysOutputData": true,
       "credentials": {
@@ -269,10 +269,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1040,
-        -128
+        1936,
+        -32
       ],
-      "id": "b9fa00cd-2744-4aff-9b19-860512423210",
+      "id": "d30ef35a-e84a-45c4-b96b-baff1dd3de17",
       "name": "Upsert Context",
       "alwaysOutputData": true,
       "credentials": {
@@ -293,10 +293,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        448,
-        96
+        1344,
+        192
       ],
-      "id": "fedd0ab9-8c88-4b37-82ba-e312d8bfcbd2",
+      "id": "2827ff6a-dc03-40ac-896a-7d726e5122cb",
       "name": "Fetch Recent for Detection",
       "alwaysOutputData": true,
       "credentials": {
@@ -315,23 +315,23 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        848,
-        96
+        1744,
+        192
       ],
-      "id": "1a7a5597-9ce8-46d6-a52c-d88926edc08d",
+      "id": "6c44192a-19ad-4d59-9760-8932d0d78083",
       "name": "Detect Topic Shift"
     },
     {
       "parameters": {
-        "jsCode": "// Process topic detection result\nconst trigger = $('Start').first().json || {};\nconst aiOutput = $json.output || '{}';\n\n// Parse AI response\nlet result = { is_topic_shift: false, confidence: 0, new_topic_name: null, reasoning: '' };\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  result = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse AI response:', aiOutput);\n}\n\nconst CONFIDENCE_THRESHOLD = 0.7;\nconst isShift = result.is_topic_shift && result.confidence >= CONFIDENCE_THRESHOLD;\n\n// Log the result (you can see this in execution logs)\nconsole.log('=== TOPIC DETECTION ===' );\nconsole.log('Context ID:', trigger.context_id);\nconsole.log('Topic Shift:', isShift);\nconsole.log('Confidence:', result.confidence);\nconsole.log('New Topic:', result.new_topic_name);\nconsole.log('Reasoning:', result.reasoning);\nconsole.log('=======================');\n\n// Pass through for future use\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    topic_shift_detected: isShift,\n    shift_confidence: result.confidence,\n    suggested_topic_name: result.new_topic_name,\n    shift_reasoning: result.reasoning\n  }\n}];"
+        "jsCode": "// Process topic detection result\nconst trigger = $('Start').first().json || {};\nconst aiOutput = $json.output || '{}';\n\n// Parse AI response\nlet result = { is_topic_shift: false, confidence: 0, new_topic_name: null, reasoning: '' };\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  result = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse AI response:', aiOutput);\n}\n\nconst CONFIDENCE_THRESHOLD = 0.7;\nconst isShift = result.is_topic_shift && result.confidence >= CONFIDENCE_THRESHOLD;\n\n// Log the result\nconsole.log('=== TOPIC DETECTION ===' );\nconsole.log('Context ID:', trigger.context_id);\nconsole.log('Topic Shift:', isShift);\nconsole.log('Confidence:', result.confidence);\nconsole.log('New Topic:', result.new_topic_name);\nconsole.log('Reasoning:', result.reasoning);\nif (isShift) {\n  console.log('⚠️  TOPIC CHANGED - State will be reset');\n} else {\n  console.log('✓ Continuing current topic');\n}\nconsole.log('=======================');\n\n// Pass through for state update\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    topic_shift_detected: isShift,\n    shift_confidence: result.confidence,\n    suggested_topic_name: result.new_topic_name || 'Untitled Topic',\n    shift_reasoning: result.reasoning\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1136,
-        96
+        2032,
+        192
       ],
-      "id": "dc2f6cd8-3c84-48db-b442-17f494732387",
+      "id": "2e49a0d8-d458-4c36-adb0-c2848ede9bd1",
       "name": "Log Detection Result"
     },
     {
@@ -347,10 +347,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        848,
-        288
+        1744,
+        384
       ],
-      "id": "a25c5581-cf6e-4d3a-97bc-e85eeb7126c7",
+      "id": "eef57868-8374-4179-8590-ca640656f0ab",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -366,11 +366,33 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        656,
-        96
+        1552,
+        192
       ],
-      "id": "95b272b0-b878-4310-b1e4-68eb5d1c86e9",
+      "id": "03540c1a-19b2-4947-8137-3e1f4bc35abd",
       "name": "Prepare Detection Data"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Get the last message ID\nWITH last_msg AS (\n  SELECT id FROM {{ $('Start').first().json.table_prefix }}chat_transcript\n  WHERE context_id = '{{ $json.context_id }}'\n  ORDER BY created_at DESC\n  LIMIT 1\n)\n-- Insert or update topic state\nINSERT INTO {{ $('Start').first().json.table_prefix }}topic_state\n(context_id, current_topic_start_id, current_topic_name, messages_in_current_topic, last_check_message_id)\nSELECT \n  '{{ $json.context_id }}',\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN (SELECT id FROM last_msg)\n    ELSE COALESCE(\n      (SELECT current_topic_start_id FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      (SELECT id FROM last_msg)\n    )\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN '{{ String($json.suggested_topic_name || \"New Topic\").replace(/'/g, \"''\") }}'\n    ELSE COALESCE(\n      (SELECT current_topic_name FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      'Initial Topic'\n    )\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN 1\n    ELSE COALESCE(\n      (SELECT messages_in_current_topic + 1 FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      1\n    )\n  END,\n  (SELECT id FROM last_msg)\nON CONFLICT (context_id) DO UPDATE SET\n  current_topic_start_id = EXCLUDED.current_topic_start_id,\n  current_topic_name = EXCLUDED.current_topic_name,\n  messages_in_current_topic = EXCLUDED.messages_in_current_topic,\n  last_check_message_id = EXCLUDED.last_check_message_id,\n  updated_at = timezone('utc'::text, now());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2224,
+        192
+      ],
+      "id": "d35ea082-e210-4c57-8eb8-69d709858d99",
+      "name": "Update Topic State",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -584,13 +606,24 @@
           }
         ]
       ]
+    },
+    "Log Detection Result": {
+      "main": [
+        [
+          {
+            "node": "Update Topic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "9da65c37-ede2-4ba7-803d-9d8675ee0b7d",
+  "versionId": "55793411-1558-4287-9bf8-6960339bbc2f",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
