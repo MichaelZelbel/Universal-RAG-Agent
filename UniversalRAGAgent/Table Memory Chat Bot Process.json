@@ -10,10 +10,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -320,
-        64
+        -2960,
+        -288
       ],
-      "id": "370096bf-949e-4211-a6f4-52a0990cc99b",
+      "id": "c4b7089a-72f8-4f28-a464-6647e078675e",
       "name": "Memory Manager"
     },
     {
@@ -23,10 +23,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1744,
-        -32
+        -896,
+        -384
       ],
-      "id": "51bc5108-6662-4f2c-ab0f-6c3f3577b140",
+      "id": "74404766-ff45-43a7-ab6d-754a484dc7da",
       "name": "Build Next Context"
     },
     {
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        32,
-        64
+        -2608,
+        -288
       ],
-      "id": "6e6b4ee6-c241-46d4-8028-f5eb51113b77",
+      "id": "57cc56d1-268f-497b-a39d-d86f28b574a0",
       "name": "Prepare Messages"
     },
     {
@@ -56,10 +56,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        240,
-        64
+        -2400,
+        -288
       ],
-      "id": "d9882c35-a80e-4a3d-8cb4-6f5b15185dcd",
+      "id": "54bb0f11-4fce-4921-a1d7-6529c9c6beb2",
       "name": "Check If Summary Needed"
     },
     {
@@ -71,10 +71,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        448,
-        -128
+        -2192,
+        -480
       ],
-      "id": "f9b21764-e802-4516-bfa3-4d99b89d5fc1",
+      "id": "686785a5-5510-409a-bc70-22b00d16bdc4",
       "name": "Summarize Long Message"
     },
     {
@@ -84,10 +84,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        752,
-        -128
+        -1888,
+        -480
       ],
-      "id": "0d3becb1-cbbc-43e1-a8a6-e2e7f5187ce6",
+      "id": "27d29814-2a41-4609-8171-d992ef9e044e",
       "name": "Combine Message with Summary"
     },
     {
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        752,
-        80
+        -1888,
+        -272
       ],
-      "id": "84b7804d-6cb9-459a-81dc-13a37430b13c",
+      "id": "ef0a993f-e4fa-41ab-a8b9-90298df6a1c2",
       "name": "Use Original Message"
     },
     {
@@ -109,10 +109,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        960,
-        64
+        -1680,
+        -288
       ],
-      "id": "1fe4c289-bbc2-4fcf-949c-ba39e12efc97",
+      "id": "2732a906-2d6b-4aaf-8c1c-a8c14d0cecdf",
       "name": "Merge Messages"
     },
     {
@@ -128,10 +128,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -320,
-        272
+        -2960,
+        -64
       ],
-      "id": "701dac4d-7259-4564-976c-b48335263fa5",
+      "id": "df805f5f-82f8-4ea2-b011-78070721d6bb",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -153,10 +153,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        448,
-        16
+        -2192,
+        -336
       ],
-      "id": "78df2e68-7148-4d84-a6e8-201e8e420edc",
+      "id": "2d37aed9-11d9-4043-b190-5450e73196ae",
       "name": "OpenAI Chat Model2",
       "credentials": {
         "openAiApi": {
@@ -173,10 +173,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -528,
-        64
+        -3168,
+        -288
       ],
-      "id": "b7875201-90ad-466f-a2a6-f0ebd0a5fdaf",
+      "id": "ca8f6d52-f286-48f0-bcd3-9e11cc471e63",
       "name": "Start"
     },
     {
@@ -187,11 +187,11 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        32,
-        -256
+        -2608,
+        -608
       ],
       "typeVersion": 1,
-      "id": "5bad7416-fdbd-401b-b546-f45f6be1745c",
+      "id": "18edf284-d5ea-4ded-bb57-0804693c389c",
       "name": "Sticky Note"
     },
     {
@@ -203,10 +203,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1152,
-        64
+        -1488,
+        -288
       ],
-      "id": "949d5a80-edfc-41ed-94cc-ee70915ddf4b",
+      "id": "a5511430-e0bf-4536-84b6-20bfad2a0cfb",
       "name": "Insert Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -225,10 +225,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1344,
-        -32
+        -1296,
+        -384
       ],
-      "id": "ba71b7cc-899c-45a2-8b54-a76c2a097776",
+      "id": "f702dc96-152f-4bd1-a8bc-5ec6e4f5b383",
       "name": "Fetch Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -247,10 +247,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1552,
-        -32
+        -1088,
+        -384
       ],
-      "id": "1e814607-d69d-4374-9f2c-fc970f2443b4",
+      "id": "6b68e9d3-67c1-4298-a012-25fcdd3339a8",
       "name": "Fetch Topic Summaries",
       "alwaysOutputData": true,
       "credentials": {
@@ -269,10 +269,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1936,
-        -32
+        -704,
+        -384
       ],
-      "id": "d30ef35a-e84a-45c4-b96b-baff1dd3de17",
+      "id": "b1c7869b-c9b9-42f8-969a-2d2b94cf08fb",
       "name": "Upsert Context",
       "alwaysOutputData": true,
       "credentials": {
@@ -293,10 +293,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1344,
-        192
+        -1296,
+        -160
       ],
-      "id": "2827ff6a-dc03-40ac-896a-7d726e5122cb",
+      "id": "55da8b90-657b-48e6-81ac-b9679a0acafa",
       "name": "Fetch Recent for Detection",
       "alwaysOutputData": true,
       "credentials": {
@@ -315,10 +315,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        1744,
-        192
+        -896,
+        -160
       ],
-      "id": "6c44192a-19ad-4d59-9760-8932d0d78083",
+      "id": "f996f056-5271-4522-bfa6-627435723fbd",
       "name": "Detect Topic Shift"
     },
     {
@@ -328,10 +328,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2032,
-        192
+        -608,
+        -160
       ],
-      "id": "2e49a0d8-d458-4c36-adb0-c2848ede9bd1",
+      "id": "11d1d0e7-33df-4c26-a905-8a0a83fb7326",
       "name": "Log Detection Result"
     },
     {
@@ -347,10 +347,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        1744,
-        384
+        -896,
+        48
       ],
-      "id": "eef57868-8374-4179-8590-ca640656f0ab",
+      "id": "49f1fa51-a2e0-4a2e-88ab-16e390002c6e",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -366,31 +366,179 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1552,
-        192
+        -1088,
+        -160
       ],
-      "id": "03540c1a-19b2-4947-8137-3e1f4bc35abd",
+      "id": "e32b487b-5e5f-4634-b5a4-b83bb0e49988",
       "name": "Prepare Detection Data"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "-- Get the last message ID\nWITH last_msg AS (\n  SELECT id FROM {{ $('Start').first().json.table_prefix }}chat_transcript\n  WHERE context_id = '{{ $json.context_id }}'\n  ORDER BY created_at DESC\n  LIMIT 1\n)\n-- Insert or update topic state\nINSERT INTO {{ $('Start').first().json.table_prefix }}topic_state\n(context_id, current_topic_start_id, current_topic_name, messages_in_current_topic, last_check_message_id)\nSELECT \n  '{{ $json.context_id }}',\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN (SELECT id FROM last_msg)\n    ELSE COALESCE(\n      (SELECT current_topic_start_id FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      (SELECT id FROM last_msg)\n    )\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN '{{ String($json.suggested_topic_name || \"New Topic\").replace(/'/g, \"''\") }}'\n    ELSE COALESCE(\n      (SELECT current_topic_name FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      'Initial Topic'\n    )\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN 1\n    ELSE COALESCE(\n      (SELECT messages_in_current_topic + 1 FROM {{ $('Start').first().json.table_prefix }}topic_state WHERE context_id = '{{ $json.context_id }}'),\n      1\n    )\n  END,\n  (SELECT id FROM last_msg)\nON CONFLICT (context_id) DO UPDATE SET\n  current_topic_start_id = EXCLUDED.current_topic_start_id,\n  current_topic_name = EXCLUDED.current_topic_name,\n  messages_in_current_topic = EXCLUDED.messages_in_current_topic,\n  last_check_message_id = EXCLUDED.last_check_message_id,\n  updated_at = timezone('utc'::text, now());",
+        "query": "-- Get current state before update\nWITH current_state AS (\n  SELECT \n    current_topic_start_id,\n    current_topic_name,\n    messages_in_current_topic\n  FROM {{ $('Start').first().json.table_prefix }}topic_state\n  WHERE context_id = '{{ $json.context_id }}'\n),\nlast_msg AS (\n  SELECT id FROM {{ $('Start').first().json.table_prefix }}chat_transcript\n  WHERE context_id = '{{ $json.context_id }}'\n  ORDER BY created_at DESC\n  LIMIT 1\n)\n-- Insert or update and return info\nINSERT INTO {{ $('Start').first().json.table_prefix }}topic_state\n(context_id, current_topic_start_id, current_topic_name, messages_in_current_topic, last_check_message_id)\nSELECT \n  '{{ $json.context_id }}',\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN (SELECT id FROM last_msg)\n    ELSE COALESCE((SELECT current_topic_start_id FROM current_state), (SELECT id FROM last_msg))\n  END as new_start_id,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN '{{ String($json.suggested_topic_name || \"New Topic\").replace(/'/g, \"''\") }}'\n    ELSE COALESCE((SELECT current_topic_name FROM current_state), 'Initial Topic')\n  END as new_name,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN 1\n    ELSE COALESCE((SELECT messages_in_current_topic + 1 FROM current_state), 1)\n  END as new_count,\n  (SELECT id FROM last_msg)\nON CONFLICT (context_id) DO UPDATE SET\n  current_topic_start_id = EXCLUDED.current_topic_start_id,\n  current_topic_name = EXCLUDED.current_topic_name,\n  messages_in_current_topic = EXCLUDED.messages_in_current_topic,\n  last_check_message_id = EXCLUDED.last_check_message_id,\n  updated_at = timezone('utc'::text, now())\nRETURNING \n  (SELECT current_topic_start_id FROM current_state) as previous_topic_start_id,\n  (SELECT current_topic_name FROM current_state) as previous_topic_name,\n  (SELECT messages_in_current_topic FROM current_state) as previous_topic_message_count,\n  current_topic_start_id,\n  context_id,\n  {{ $json.topic_shift_detected }}::boolean as topic_shift_detected;",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2224,
-        192
+        -416,
+        -160
       ],
-      "id": "d35ea082-e210-4c57-8eb8-69d709858d99",
+      "id": "5b23a6f0-94dd-48e1-98ce-a90b2d158eec",
       "name": "Update Topic State",
       "alwaysOutputData": true,
       "credentials": {
         "postgres": {
           "id": "p1yb7OdsllaTAj7J",
           "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.topic_shift_detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.previous_topic_message_count }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        -160
+      ],
+      "id": "8b137dcb-09eb-4623-bf2d-905f0bf8c23e",
+      "name": "Should Create Summary?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  role,\n  message,\n  message_original,\n  created_at\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $json.context_id }}'\n  AND id >= {{ $json.previous_topic_start_id }}\n  AND id < {{ $json.current_topic_start_id }}\nORDER BY created_at ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        32,
+        -176
+      ],
+      "id": "ca63d057-3ad0-44bf-be18-d9d35bc5fc5a",
+      "name": "Fetch Topic Messages",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare messages for summarization\nconst stateData = $('Update Topic State').first().json;\nconst messages = $input.all().map(i => i.json);\n\n// Format conversation\nconst conversation = messages.map(m => {\n  const content = m.message_original || m.message;\n  return `${m.role}: ${content}`;\n}).join('\\n\\n');\n\n// Build summarization prompt\nconst prompt = `Create a concise summary of this conversation topic.\n\nConversation (${messages.length} messages):\n${conversation}\n\nProvide a JSON response (no markdown, no code blocks):\n{\n  \"topic_title\": \"Brief 5-8 word description\",\n  \"main_summary\": \"2-3 sentence overview\",\n  \"key_points\": [\"point 1\", \"point 2\", \"point 3\"],\n  \"decisions_made\": [\"decision 1\"] or [],\n  \"action_items\": [\"action 1\"] or []\n}\n\nGuidelines:\n- Keep concise and focused\n- Capture main ideas and important details\n- Omit greetings and casual chat`;\n\nreturn [{\n  json: {\n    context_id: stateData.context_id,\n    first_message_id: messages[0].id,\n    last_message_id: messages[messages.length - 1].id,\n    message_count: messages.length,\n    previous_topic_name: stateData.previous_topic_name,\n    summarization_prompt: prompt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -176
+      ],
+      "id": "29f74681-7af3-43e6-8c8a-6a3246dedb04",
+      "name": "Prepare Summarization"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.summarization_prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        -176
+      ],
+      "id": "572ed300-cff3-4480-ad8a-1719f380b993",
+      "name": "Generate Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the AI summary for storage\nconst summaryInput = $('Prepare Summarization').first().json;\nconst aiOutput = $json.output || '{}';\n\n// Parse AI response\nlet parsed;\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse summary:', aiOutput);\n  parsed = {\n    topic_title: summaryInput.previous_topic_name || 'Topic',\n    main_summary: aiOutput.substring(0, 200),\n    key_points: [],\n    decisions_made: [],\n    action_items: []\n  };\n}\n\n// Format the full summary\nlet fullSummary = `${parsed.main_summary}\\n\\n`;\n\nif (parsed.key_points?.length > 0) {\n  fullSummary += `Key Points: ${parsed.key_points.join('; ')}\\n`;\n}\n\nif (parsed.decisions_made?.length > 0) {\n  fullSummary += `Decisions: ${parsed.decisions_made.join('; ')}\\n`;\n}\n\nif (parsed.action_items?.length > 0) {\n  fullSummary += `Actions: ${parsed.action_items.join('; ')}`;\n}\n\nconsole.log('=== TOPIC SUMMARY CREATED ===');\nconsole.log('Title:', parsed.topic_title);\nconsole.log('Messages:', summaryInput.first_message_id, 'to', summaryInput.last_message_id);\nconsole.log('Count:', summaryInput.message_count);\nconsole.log('============================');\n\nreturn [{\n  json: {\n    context_id: summaryInput.context_id,\n    topic_title: parsed.topic_title,\n    topic_summary: fullSummary.trim(),\n    first_message_id: summaryInput.first_message_id,\n    last_message_id: summaryInput.last_message_id,\n    message_count: summaryInput.message_count\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -176
+      ],
+      "id": "e8f97d5f-da8f-45a6-9613-370144e12eaf",
+      "name": "Format Summary"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}chat_topic_summaries\n(context_id, topic_title, topic_summary, first_message_id, last_message_id, message_count)\nVALUES (\n  '{{ $json.context_id }}',\n  '{{ String($json.topic_title).replace(/'/g, \"''\") }}',\n  '{{ String($json.topic_summary).replace(/'/g, \"''\") }}',\n  {{ $json.first_message_id }},\n  {{ $json.last_message_id }},\n  {{ $json.message_count }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        928,
+        -176
+      ],
+      "id": "da1d4d51-05ed-4bfd-8733-da7bc5548f29",
+      "name": "Insert Summary",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        432,
+        -16
+      ],
+      "id": "602faa5d-d1c2-4d52-821d-27fb9577d89f",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
         }
       }
     }
@@ -617,13 +765,90 @@
           }
         ]
       ]
+    },
+    "Update Topic State": {
+      "main": [
+        [
+          {
+            "node": "Should Create Summary?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Summary?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Topic Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Topic Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Summarization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Summarization": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Insert Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "55793411-1558-4287-9bf8-6960339bbc2f",
+  "versionId": "f46c3474-1aec-48ed-bfa6-2c362136743d",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
