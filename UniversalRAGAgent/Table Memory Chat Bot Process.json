@@ -10,23 +10,23 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -2960,
-        -288
+        -1952,
+        336
       ],
-      "id": "c4b7089a-72f8-4f28-a464-6647e078675e",
+      "id": "27faa1e6-2a24-4bb7-a4dd-d701c25afd79",
       "name": "Memory Manager"
     },
     {
       "parameters": {
-        "jsCode": "// Run Once for All Items\n\n// Inputs\nconst trigger = $('Start').first().json || {};\nconst transcriptRows = $('Fetch Transcript').all().map(i => i.json || {});\nconst summaryRows = $('Fetch Topic Summaries').all().map(i => i.json || {});\n\n// Filter and sort transcript messages\nconst rows = transcriptRows\n  .filter(r => !r.context_id || String(r.context_id) === String(trigger.context_id))\n  .sort((a, b) => {\n    const ts = v => Date.parse(v || '') || 0;\n    return ts(a.created_at || a.createdAt) - ts(b.created_at || b.createdAt);\n  });\n\n// Convert rows to context.recent_messages\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  \n  return {\n    id: r.id,\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original\n  };\n});\n\n// Convert summaries (reverse for chronological order)\nconst topic_summaries = summaryRows\n  .reverse()\n  .map(s => ({\n    topic_title: s.topic_title || '',\n    summary: s.topic_summary || '',\n    message_range: [s.first_message_id, s.last_message_id],\n    message_count: s.message_count || 0\n  }));\n\n// Keep any existing long-term memories\nlet long_term_memories = [];\ntry {\n  if (trigger.context && typeof trigger.context === 'string') {\n    const parsed = JSON.parse(trigger.context);\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  } else if (trigger.context && typeof trigger.context === 'object' &&\n             Array.isArray(trigger.context.long_term_memories)) {\n    long_term_memories = trigger.context.long_term_memories;\n  }\n} catch { /* ignore */ }\n\nconst context = { \n  topic_summaries,      // NEW: Historical topic summaries\n  recent_messages, \n  long_term_memories \n};\n\nreturn [\n  {\n    json: {\n      context_id: String(trigger.context_id || ''),\n      context: JSON.stringify(context),\n      userMessage: String(trigger.userMessage ?? ''),\n      assistantResponse: String(trigger.assistantResponse ?? '')\n    }\n  }\n];\n"
+        "jsCode": "// Build context with all summaries (including gap-filled)\nconst trigger = $('Start').first().json || {};\nconst mergedData = $('Merge Gap Summary').first().json;\nconst transcriptRows = mergedData.transcript_rows || [];\nconst summaryRows = mergedData.summary_rows || [];\n\n// Sort transcript\nconst rows = transcriptRows\n  .filter(r => !r.context_id || String(r.context_id) === String(trigger.context_id))\n  .sort((a, b) => {\n    const ts = v => Date.parse(v || '') || 0;\n    return ts(a.created_at || a.createdAt) - ts(b.created_at || b.createdAt);\n  });\n\n// Format recent messages\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  \n  return {\n    id: r.id,\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original\n  };\n});\n\n// Format summaries (oldest to newest)\nconst topic_summaries = summaryRows.map(s => ({\n  topic_title: s.topic_title || '',\n  summary: s.topic_summary || '',\n  message_range: [s.first_message_id, s.last_message_id],\n  message_count: s.message_count || 0\n}));\n\n// Get long-term memories\nlet long_term_memories = [];\ntry {\n  if (trigger.context && typeof trigger.context === 'string') {\n    const parsed = JSON.parse(trigger.context);\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  } else if (trigger.context && typeof trigger.context === 'object' &&\n             Array.isArray(trigger.context.long_term_memories)) {\n    long_term_memories = trigger.context.long_term_memories;\n  }\n} catch { /* ignore */ }\n\nconst context = { \n  topic_summaries,\n  recent_messages, \n  long_term_memories \n};\n\nreturn [{\n  json: {\n    context_id: String(trigger.context_id || ''),\n    context: JSON.stringify(context),\n    userMessage: String(trigger.userMessage ?? ''),\n    assistantResponse: String(trigger.assistantResponse ?? '')\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -896,
-        -384
+        128,
+        240
       ],
-      "id": "74404766-ff45-43a7-ab6d-754a484dc7da",
+      "id": "0b702d5c-5498-448e-8dff-6cd7da6c7ae1",
       "name": "Build Next Context"
     },
     {
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2608,
-        -288
+        -1600,
+        336
       ],
-      "id": "57cc56d1-268f-497b-a39d-d86f28b574a0",
+      "id": "9ba5f708-5a1a-4703-91f7-b877c2aec493",
       "name": "Prepare Messages"
     },
     {
@@ -56,10 +56,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -2400,
-        -288
+        -1392,
+        336
       ],
-      "id": "54bb0f11-4fce-4921-a1d7-6529c9c6beb2",
+      "id": "758dfb67-8d1e-4d9a-b19f-8dc39a298045",
       "name": "Check If Summary Needed"
     },
     {
@@ -71,10 +71,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -2192,
-        -480
+        -1184,
+        144
       ],
-      "id": "686785a5-5510-409a-bc70-22b00d16bdc4",
+      "id": "19d0901f-b2de-41e0-9e11-741358f9c141",
       "name": "Summarize Long Message"
     },
     {
@@ -84,10 +84,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1888,
-        -480
+        -880,
+        144
       ],
-      "id": "27d29814-2a41-4609-8171-d992ef9e044e",
+      "id": "522df475-f90e-4a8c-bb60-b8b83253fbe5",
       "name": "Combine Message with Summary"
     },
     {
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1888,
-        -272
+        -880,
+        352
       ],
-      "id": "ef0a993f-e4fa-41ab-a8b9-90298df6a1c2",
+      "id": "56331973-7040-4a2a-8e67-acff4bf3f1ab",
       "name": "Use Original Message"
     },
     {
@@ -109,10 +109,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        -1680,
-        -288
+        -672,
+        336
       ],
-      "id": "2732a906-2d6b-4aaf-8c1c-a8c14d0cecdf",
+      "id": "cb40cad8-6df1-43d7-bc15-f9e83ba0c60c",
       "name": "Merge Messages"
     },
     {
@@ -128,10 +128,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -2960,
-        -64
+        -1952,
+        560
       ],
-      "id": "df805f5f-82f8-4ea2-b011-78070721d6bb",
+      "id": "1a5282f0-68ce-489f-bb21-236bf6256425",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -153,10 +153,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -2192,
-        -336
+        -1184,
+        288
       ],
-      "id": "2d37aed9-11d9-4043-b190-5450e73196ae",
+      "id": "70080ec7-9115-4d09-a146-76ec7e26eb50",
       "name": "OpenAI Chat Model2",
       "credentials": {
         "openAiApi": {
@@ -173,10 +173,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -3168,
-        -288
+        -2160,
+        336
       ],
-      "id": "ca8f6d52-f286-48f0-bcd3-9e11cc471e63",
+      "id": "adb5545b-b918-435e-8d2a-e3450f737de8",
       "name": "Start"
     },
     {
@@ -187,11 +187,11 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -2608,
-        -608
+        -1600,
+        16
       ],
       "typeVersion": 1,
-      "id": "18edf284-d5ea-4ded-bb57-0804693c389c",
+      "id": "cfdb0ef1-94d4-4d1d-93eb-098ba1ca1e08",
       "name": "Sticky Note"
     },
     {
@@ -203,10 +203,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -1488,
-        -288
+        -480,
+        336
       ],
-      "id": "a5511430-e0bf-4536-84b6-20bfad2a0cfb",
+      "id": "50e81693-b009-4db6-84b2-1b736bdd2f9a",
       "name": "Insert Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -225,10 +225,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -1296,
-        -384
+        -288,
+        240
       ],
-      "id": "f702dc96-152f-4bd1-a8bc-5ec6e4f5b383",
+      "id": "e99908a1-140b-4e69-9113-5a94244f3ddc",
       "name": "Fetch Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -247,10 +247,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -1088,
-        -384
+        -64,
+        240
       ],
-      "id": "6b68e9d3-67c1-4298-a012-25fcdd3339a8",
+      "id": "874a1a59-7722-4ee6-a6d2-52d1ec349c34",
       "name": "Fetch Topic Summaries",
       "alwaysOutputData": true,
       "credentials": {
@@ -269,10 +269,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -704,
-        -384
+        320,
+        240
       ],
-      "id": "b1c7869b-c9b9-42f8-969a-2d2b94cf08fb",
+      "id": "b52d5766-6b51-41fa-880b-981d08c9509f",
       "name": "Upsert Context",
       "alwaysOutputData": true,
       "credentials": {
@@ -293,10 +293,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -1296,
-        -160
+        -288,
+        464
       ],
-      "id": "55da8b90-657b-48e6-81ac-b9679a0acafa",
+      "id": "f80d03df-0505-433d-b364-225a4b67050a",
       "name": "Fetch Recent for Detection",
       "alwaysOutputData": true,
       "credentials": {
@@ -315,10 +315,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -896,
-        -160
+        128,
+        464
       ],
-      "id": "f996f056-5271-4522-bfa6-627435723fbd",
+      "id": "065b1f2c-68b0-4204-ad1e-bb792e0e8566",
       "name": "Detect Topic Shift"
     },
     {
@@ -328,10 +328,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -608,
-        -160
+        416,
+        464
       ],
-      "id": "11d1d0e7-33df-4c26-a905-8a0a83fb7326",
+      "id": "06ab4a1d-f666-4153-a3af-1d3ae48d1843",
       "name": "Log Detection Result"
     },
     {
@@ -347,10 +347,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -896,
-        48
+        128,
+        672
       ],
-      "id": "49f1fa51-a2e0-4a2e-88ab-16e390002c6e",
+      "id": "7e1ffa30-adbf-4a6b-9881-19edf9b86878",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -366,10 +366,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1088,
-        -160
+        -64,
+        464
       ],
-      "id": "e32b487b-5e5f-4634-b5a4-b83bb0e49988",
+      "id": "0cdebff9-a511-4c02-b80a-b117dbbd364f",
       "name": "Prepare Detection Data"
     },
     {
@@ -381,10 +381,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -416,
-        -160
+        608,
+        464
       ],
-      "id": "5b23a6f0-94dd-48e1-98ce-a90b2d158eec",
+      "id": "c7bc1ef8-638f-401e-a70a-6dd4cd249efe",
       "name": "Update Topic State",
       "alwaysOutputData": true,
       "credentials": {
@@ -427,10 +427,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -208,
-        -160
+        816,
+        464
       ],
-      "id": "8b137dcb-09eb-4623-bf2d-905f0bf8c23e",
+      "id": "b8518c9c-5841-44cf-ac3f-98a9da0af05e",
       "name": "Should Create Summary?"
     },
     {
@@ -442,10 +442,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        32,
-        -176
+        1056,
+        448
       ],
-      "id": "ca63d057-3ad0-44bf-be18-d9d35bc5fc5a",
+      "id": "fd942a8c-34db-41a8-8f6c-852a931a187c",
       "name": "Fetch Topic Messages",
       "alwaysOutputData": true,
       "credentials": {
@@ -462,10 +462,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        240,
-        -176
+        1264,
+        448
       ],
-      "id": "29f74681-7af3-43e6-8c8a-6a3246dedb04",
+      "id": "321e9b01-d21a-4976-8409-82498e281996",
       "name": "Prepare Summarization"
     },
     {
@@ -477,10 +477,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        432,
-        -176
+        1456,
+        448
       ],
-      "id": "572ed300-cff3-4480-ad8a-1719f380b993",
+      "id": "944d71d5-0c64-4e8f-ab29-c60dc1fa4ca8",
       "name": "Generate Summary"
     },
     {
@@ -490,10 +490,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        736,
-        -176
+        1760,
+        448
       ],
-      "id": "e8f97d5f-da8f-45a6-9613-370144e12eaf",
+      "id": "8e139c37-c34a-4520-b9aa-308d3196993f",
       "name": "Format Summary"
     },
     {
@@ -505,10 +505,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        928,
-        -176
+        1952,
+        448
       ],
-      "id": "da1d4d51-05ed-4bfd-8733-da7bc5548f29",
+      "id": "acd71c90-48e1-468c-8a7d-86d3fc22d0fc",
       "name": "Insert Summary",
       "alwaysOutputData": true,
       "credentials": {
@@ -530,11 +530,177 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        432,
-        -16
+        1456,
+        608
       ],
-      "id": "602faa5d-d1c2-4d52-821d-27fb9577d89f",
+      "id": "c62c0d22-49f5-431f-9751-c0077eb6195a",
       "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check for gap between summaries and recent messages\nconst trigger = $('Start').first().json || {};\nconst summaryRows = $('Fetch Topic Summaries').all().map(i => i.json || {});\nconst transcriptRows = $('Fetch Transcript').all().map(i => i.json || {});\n\n// Sort transcript by ID to find oldest recent message\nconst sortedTranscript = transcriptRows\n  .filter(r => r.id)\n  .sort((a, b) => a.id - b.id);\n\nconst oldestRecentMessageId = sortedTranscript.length > 0 ? sortedTranscript[0].id : 999999;\n\n// Find last summary's end message ID\nconst lastSummaryEndId = summaryRows.length > 0 \n  ? Math.max(...summaryRows.map(s => s.last_message_id || 0))\n  : 0;\n\n// Calculate gap\nconst gapStart = lastSummaryEndId + 1;\nconst gapEnd = oldestRecentMessageId - 1;\nconst gapSize = gapEnd - gapStart + 1;\nconst hasGap = gapSize >= 3 && lastSummaryEndId > 0;\n\nconsole.log('=== GAP DETECTION ===');\nconsole.log('Last summary ended at:', lastSummaryEndId);\nconsole.log('Recent window starts at:', oldestRecentMessageId);\nconsole.log('Gap:', gapStart, 'to', gapEnd, '=', gapSize, 'messages');\nconsole.log('Should fill gap:', hasGap);\nconsole.log('====================');\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    has_gap: hasGap,\n    gap_start_id: gapStart,\n    gap_end_id: gapEnd,\n    gap_size: gapSize,\n    summary_rows: summaryRows,\n    transcript_rows: transcriptRows\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        240
+      ],
+      "id": "7b4aa6e4-524d-47ab-bbf4-cff8ea7634c7",
+      "name": "Detect Gap"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_gap }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        240
+      ],
+      "id": "2b488d5b-256b-444f-a326-196b14889529",
+      "name": "Should Fill Gap?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  role,\n  message,\n  message_original,\n  created_at\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $json.context_id }}'\n  AND id >= {{ $json.gap_start_id }}\n  AND id <= {{ $json.gap_end_id }}\nORDER BY created_at ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1632,
+        32
+      ],
+      "id": "f793f693-48a3-4757-afd6-fca704d50b48",
+      "name": "Fetch Gap Messages",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare gap messages for summarization\nconst gapData = $('Should Fill Gap?').first().json;\nconst messages = $input.all().map(i => i.json);\n\n// Format conversation\nconst conversation = messages.map(m => {\n  const content = m.message_original || m.message;\n  return `${m.role}: ${content}`;\n}).join('\\n\\n');\n\n// Build prompt\nconst prompt = `Create a concise summary of this conversation segment.\n\nConversation (${messages.length} messages):\n${conversation}\n\nProvide JSON (no markdown):\n{\n  \"topic_title\": \"5-8 word description\",\n  \"main_summary\": \"2-3 sentences\",\n  \"key_points\": [\"point 1\", \"point 2\"],\n  \"decisions_made\": [],\n  \"action_items\": []\n}\n\nKeep concise and capture main ideas.`;\n\nconsole.log('=== FILLING GAP ===');\nconsole.log('Gap messages:', gapData.gap_start_id, 'to', gapData.gap_end_id);\nconsole.log('Count:', messages.length);\nconsole.log('===================');\n\nreturn [{\n  json: {\n    context_id: gapData.context_id,\n    first_message_id: messages[0].id,\n    last_message_id: messages[messages.length - 1].id,\n    message_count: messages.length,\n    summarization_prompt: prompt,\n    gap_data: gapData\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        32
+      ],
+      "id": "6f33db1f-0b82-4ab4-b68e-8f1b3b7bc1b4",
+      "name": "Prepare Gap Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.summarization_prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        32
+      ],
+      "id": "1d06ca8d-be9e-4d5a-8ff9-c5ecb0493ccd",
+      "name": "Generate Gap Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format gap summary for storage\nconst summaryInput = $('Prepare Gap Summary').first().json;\nconst aiOutput = $json.output || '{}';\n\n// Parse AI response\nlet parsed;\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse gap summary:', aiOutput);\n  parsed = {\n    topic_title: 'Gap Summary',\n    main_summary: aiOutput.substring(0, 200),\n    key_points: []\n  };\n}\n\n// Format full summary\nlet fullSummary = `${parsed.main_summary}\\n\\n`;\nif (parsed.key_points?.length > 0) {\n  fullSummary += `Key Points: ${parsed.key_points.join('; ')}`;\n}\n\nconsole.log('=== GAP SUMMARY CREATED ===');\nconsole.log('Title:', parsed.topic_title);\nconsole.log('Messages:', summaryInput.first_message_id, 'to', summaryInput.last_message_id);\nconsole.log('===========================');\n\nreturn [{\n  json: {\n    context_id: summaryInput.context_id,\n    topic_title: parsed.topic_title,\n    topic_summary: fullSummary.trim(),\n    first_message_id: summaryInput.first_message_id,\n    last_message_id: summaryInput.last_message_id,\n    message_count: summaryInput.message_count,\n    gap_data: summaryInput.gap_data\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2384,
+        32
+      ],
+      "id": "a2c0dea7-2672-4478-bb9e-959a1b116627",
+      "name": "Format Gap Summary"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}chat_topic_summaries\n(context_id, topic_title, topic_summary, first_message_id, last_message_id, message_count)\nVALUES (\n  '{{ $json.context_id }}',\n  '{{ String($json.topic_title).replace(/'/g, \"''\") }}',\n  '{{ String($json.topic_summary).replace(/'/g, \"''\") }}',\n  {{ $json.first_message_id }},\n  {{ $json.last_message_id }},\n  {{ $json.message_count }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2592,
+        32
+      ],
+      "id": "8143767a-f1ef-431e-a3ae-db2df6b329e9",
+      "name": "Insert Gap Summary",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge summaries - handle both paths (gap filled or not)\nconst inputData = $input.first().json;\n\n// Determine which path we came from\nlet summaryRows = [];\nlet transcriptRows = [];\n\nif (inputData.gap_data) {\n  // Came from gap-filling path - has gap_data passed through\n  summaryRows = inputData.gap_data.summary_rows || [];\n  transcriptRows = inputData.gap_data.transcript_rows || [];\n  \n  // Add the newly created gap summary\n  summaryRows.push({\n    topic_title: inputData.topic_title,\n    topic_summary: inputData.topic_summary,\n    first_message_id: inputData.first_message_id,\n    last_message_id: inputData.last_message_id,\n    message_count: inputData.message_count\n  });\n  \n  // Re-sort by message range\n  summaryRows.sort((a, b) => a.first_message_id - b.first_message_id);\n  \n} else {\n  // Came from no-gap path - use data as-is\n  summaryRows = inputData.summary_rows || [];\n  transcriptRows = inputData.transcript_rows || [];\n}\n\nreturn [{\n  json: {\n    summary_rows: summaryRows,\n    transcript_rows: transcriptRows\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        256
+      ],
+      "id": "d84b6262-46e2-47fb-9eb4-1a1adcafc756",
+      "name": "Merge Gap Summary"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2016,
+        176
+      ],
+      "id": "490e7f22-cef3-4ddf-b63c-d840f9c407ae",
+      "name": "OpenAI Chat Model4",
       "credentials": {
         "openAiApi": {
           "id": "ypHiVnbB3jkc0yAx",
@@ -704,7 +870,7 @@
       "main": [
         [
           {
-            "node": "Build Next Context",
+            "node": "Detect Gap",
             "type": "main",
             "index": 0
           }
@@ -842,13 +1008,119 @@
           }
         ]
       ]
+    },
+    "Detect Gap": {
+      "main": [
+        [
+          {
+            "node": "Should Fill Gap?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Fill Gap?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Gap Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Gap Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Format Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Insert Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Merge Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Build Next Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Gap Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "f46c3474-1aec-48ed-bfa6-2c362136743d",
+  "versionId": "71035265-4618-48de-ab54-a35b2e8c0717",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
