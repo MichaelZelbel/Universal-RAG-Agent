@@ -1,0 +1,152 @@
+{
+  "name": "Subworkflow: Long-term Memory",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great!\",\n  \"context\": \"{\\\"long_term_memories\\\":[]}\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 400],
+      "id": "trigger-memory-001",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Long-term Memory Module\n\nExtracts and manages long-term facts:\n- User preferences\n- Personal information\n- Important facts\n- Goals and intentions\n\nOutputs:\n- new_memories (array)\n- removed_memories (array)\n- should_update (boolean)\n- updated_context (JSON)",
+        "height": 260,
+        "width": 360,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 100],
+      "id": "note-memory-001",
+      "name": "Module Purpose"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get context with memories\nconst trigger = $input.first().json;\nlet context = {};\n\ntry {\n  if (typeof trigger.context === 'string') {\n    context = JSON.parse(trigger.context);\n  } else if (typeof trigger.context === 'object') {\n    context = trigger.context;\n  }\n} catch (e) {\n  // Default empty context\n}\n\nconst long_term_memories = context.long_term_memories || [];\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    userMessage: trigger.userMessage || '',\n    assistantResponse: trigger.assistantResponse || '',\n    current_memories: long_term_memories,\n    context_str: JSON.stringify(context)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 400],
+      "id": "code-memory-001",
+      "name": "Extract Current Memories"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze if this conversation contains information worth remembering long-term.\n\nCurrent memories:\n{{ JSON.stringify($json.current_memories) }}\n\nLatest exchange:\nUser: {{ $json.userMessage }}\nAssistant: {{ $json.assistantResponse }}\n\nRespond with ONLY valid JSON:\n{\n  \"should_update\": true/false,\n  \"new_memories\": [\n    {\"type\": \"preference\", \"content\": \"User likes pizza\"},\n    {\"type\": \"fact\", \"content\": \"User lives in Berlin\"}\n  ],\n  \"remove_indices\": [0, 2]\n}\n\nMemory types:\n- preference: User likes/dislikes\n- fact: Personal information\n- goal: User intentions/goals\n- skill: User abilities\n\nOnly create memories for IMPORTANT lasting information. Not for:\n- Casual greetings\n- Temporary states\n- Session-specific info\n- Conversational filler",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [1050, 400],
+      "id": "agent-memory-001",
+      "name": "Analyze Memories"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1050, 620],
+      "id": "llm-memory-001",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse memory analysis\nconst aiOutput = $input.item.json.output || '{}';\nconst analysis = typeof aiOutput === 'string' ? JSON.parse(aiOutput) : aiOutput;\nconst memoryData = $('Extract Current Memories').first().json;\n\nif (!analysis.should_update) {\n  // No updates needed\n  return [{\n    json: {\n      should_update: false,\n      new_memories: [],\n      removed_memories: [],\n      updated_context: memoryData.context_str,\n      context_id: memoryData.context_id,\n      table_prefix: memoryData.table_prefix\n    }\n  }];\n}\n\n// Apply memory updates\nlet memories = [...memoryData.current_memories];\n\n// Remove old memories\nif (Array.isArray(analysis.remove_indices)) {\n  const toRemove = analysis.remove_indices.sort((a, b) => b - a);\n  toRemove.forEach(idx => {\n    if (idx >= 0 && idx < memories.length) {\n      memories.splice(idx, 1);\n    }\n  });\n}\n\n// Add new memories\nif (Array.isArray(analysis.new_memories)) {\n  memories = memories.concat(analysis.new_memories);\n}\n\n// Rebuild context\nconst context = JSON.parse(memoryData.context_str);\ncontext.long_term_memories = memories;\n\nreturn [{\n  json: {\n    should_update: true,\n    new_memories: analysis.new_memories || [],\n    removed_memories: analysis.remove_indices || [],\n    updated_context: JSON.stringify(context),\n    context_id: memoryData.context_id,\n    table_prefix: memoryData.table_prefix\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400],
+      "id": "code-memory-002",
+      "name": "Update Memories"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format output for main workflow\nconst result = $input.first().json;\n\nreturn [{\n  json: {\n    should_update: result.should_update,\n    new_memories: result.new_memories,\n    removed_memories: result.removed_memories,\n    context: result.updated_context,\n    context_id: result.context_id,\n    table_prefix: result.table_prefix\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 400],
+      "id": "code-memory-003",
+      "name": "Format Output"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Extract Current Memories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Current Memories": {
+      "main": [
+        [
+          {
+            "node": "Analyze Memories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Memories": {
+      "main": [
+        [
+          {
+            "node": "Update Memories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Memories",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Memories": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "long-term-memory-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

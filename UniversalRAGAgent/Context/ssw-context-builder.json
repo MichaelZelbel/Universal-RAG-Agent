@@ -1,0 +1,348 @@
+{
+  "name": "Subworkflow: Context Builder",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 400],
+      "id": "trigger-context-001",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Context Builder Module\n\nFetches all data needed for complete context:\n- Transcript messages\n- Topic summaries\n- Gap detection & filling\n\nOutputs:\n- complete_context (JSON)\n- gap_filled (boolean)\n- transcript_rows (array)\n- summary_rows (array)",
+        "height": 240,
+        "width": 360,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 120],
+      "id": "note-context-001",
+      "name": "Module Purpose"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM {{ $json.table_prefix }}transcript\nWHERE context_id = '{{ $json.context_id }}'\nORDER BY created_at ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [650, 400],
+      "id": "postgres-context-001",
+      "name": "Fetch Transcript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM {{ $('Start').item.json.table_prefix }}topic_summary\nWHERE context_id = '{{ $('Start').item.json.context_id }}'\nORDER BY created_at ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [650, 600],
+      "id": "postgres-context-002",
+      "name": "Fetch Summaries"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1050, 500],
+      "id": "merge-context-001",
+      "name": "Merge Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Detect gaps in conversation coverage\nconst transcriptData = $('Fetch Transcript').all().map(i => i.json);\nconst summaryData = $('Fetch Summaries').all().map(i => i.json);\nconst trigger = $('Start').first().json;\n\n// Build set of message IDs covered by summaries\nconst coveredIds = new Set();\nsummaryData.forEach(s => {\n  const first = s.first_message_id;\n  const last = s.last_message_id;\n  for (let id = first; id <= last; id++) {\n    coveredIds.add(id);\n  }\n});\n\n// Find gaps\nconst gaps = [];\nlet gapStart = null;\n\nfor (const msg of transcriptData) {\n  if (!coveredIds.has(msg.id)) {\n    if (gapStart === null) {\n      gapStart = msg.id;\n    }\n  } else {\n    if (gapStart !== null) {\n      gaps.push({\n        start_id: gapStart,\n        end_id: msg.id - 1\n      });\n      gapStart = null;\n    }\n  }\n}\n\n// Check for trailing gap\nif (gapStart !== null && transcriptData.length > 0) {\n  gaps.push({\n    start_id: gapStart,\n    end_id: transcriptData[transcriptData.length - 1].id\n  });\n}\n\nconst largestGap = gaps.length > 0 ? gaps[0] : null;\nconst shouldFillGap = largestGap !== null && \n                      (largestGap.end_id - largestGap.start_id + 1) >= 3;\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    transcript_rows: transcriptData,\n    summary_rows: summaryData,\n    gap_detected: largestGap !== null,\n    should_fill_gap: shouldFillGap,\n    gap: largestGap\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 500],
+      "id": "code-context-001",
+      "name": "Detect Gap"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.should_fill_gap }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1850, 500],
+      "id": "if-context-001",
+      "name": "Should Fill Gap?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT * FROM {{ $json.table_prefix }}transcript\nWHERE context_id = '{{ $json.context_id }}'\nAND id >= {{ $json.gap.start_id }}\nAND id <= {{ $json.gap.end_id }}\nORDER BY created_at ASC",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2250, 380],
+      "id": "postgres-context-003",
+      "name": "Fetch Gap Messages"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare gap messages for summarization\nconst gapMessages = $input.all().map(i => i.json);\nconst gapData = $('Detect Gap').first().json;\n\nconst formatted = gapMessages\n  .map(m => `${m.role}: ${m.message || m.message_original}`)\n  .join('\\n\\n');\n\nreturn [{\n  json: {\n    context_id: gapData.context_id,\n    table_prefix: gapData.table_prefix,\n    gap_messages: formatted,\n    first_message_id: gapData.gap.start_id,\n    last_message_id: gapData.gap.end_id,\n    message_count: gapMessages.length,\n    topic_title: 'Gap Fill'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2650, 380],
+      "id": "code-context-002",
+      "name": "Prepare Gap Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a concise summary of this conversation segment:\n\n{{ $json.gap_messages }}\n\nProvide a brief summary (2-3 sentences) covering the main points discussed.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [3050, 380],
+      "id": "agent-context-001",
+      "name": "Generate Gap Summary"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [3050, 600],
+      "id": "llm-context-001",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "={{ $('Prepare Gap Summary').item.json.table_prefix }}topic_summary",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $('Prepare Gap Summary').item.json.context_id }}",
+            "topic_title": "={{ $('Prepare Gap Summary').item.json.topic_title }}",
+            "topic_summary": "={{ $input.item.json.output }}",
+            "first_message_id": "={{ $('Prepare Gap Summary').item.json.first_message_id }}",
+            "last_message_id": "={{ $('Prepare Gap Summary').item.json.last_message_id }}",
+            "message_count": "={{ $('Prepare Gap Summary').item.json.message_count }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3450, 380],
+      "id": "postgres-context-004",
+      "name": "Insert Gap Summary"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [3850, 500],
+      "id": "merge-context-002",
+      "name": "Merge With Gap"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build final context JSON\nconst trigger = $('Start').first().json;\nlet dataSource;\n\n// Check if we filled a gap\nif ($('Merge With Gap').all().length > 0) {\n  dataSource = $('Merge With Gap').first().json;\n} else {\n  dataSource = $('Detect Gap').first().json;\n}\n\nconst transcriptRows = dataSource.transcript_rows || [];\nconst summaryRows = dataSource.summary_rows || [];\n\n// Format recent messages\nconst recent_messages = transcriptRows.map(r => ({\n  id: r.id,\n  role: r.role === 'assistant' ? 'assistant' : 'user',\n  content: r.message || r.message_original || '',\n  was_truncated: (r.message_original || '').length > (r.message || '').length\n}));\n\n// Format topic summaries\nconst topic_summaries = summaryRows.map(s => ({\n  topic_title: s.topic_title || '',\n  summary: s.topic_summary || '',\n  message_range: [s.first_message_id, s.last_message_id],\n  message_count: s.message_count || 0\n}));\n\n// Get long-term memories from trigger if available\nlet long_term_memories = [];\ntry {\n  if (trigger.context) {\n    const parsed = typeof trigger.context === 'string' \n      ? JSON.parse(trigger.context) \n      : trigger.context;\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  }\n} catch (e) {\n  // Ignore parsing errors\n}\n\nconst context = {\n  topic_summaries,\n  recent_messages,\n  long_term_memories\n};\n\nreturn [{\n  json: {\n    context: JSON.stringify(context),\n    gap_filled: dataSource.gap_detected || false,\n    transcript_rows: transcriptRows,\n    summary_rows: summaryRows,\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4250, 500],
+      "id": "code-context-003",
+      "name": "Build Final Context"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Transcript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Summaries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Transcript": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Summaries": {
+      "main": [
+        [
+          {
+            "node": "Merge Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Data": {
+      "main": [
+        [
+          {
+            "node": "Detect Gap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Gap": {
+      "main": [
+        [
+          {
+            "node": "Should Fill Gap?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Fill Gap?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Gap Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge With Gap",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch Gap Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Insert Gap Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Gap Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Gap Summary": {
+      "main": [
+        [
+          {
+            "node": "Merge With Gap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge With Gap": {
+      "main": [
+        [
+          {
+            "node": "Build Final Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Context": {
+      "main": [
+        [
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "context-builder-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

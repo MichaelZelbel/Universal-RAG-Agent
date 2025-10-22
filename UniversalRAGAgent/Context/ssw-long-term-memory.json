@@ -1,0 +1,198 @@
+{
+  "name": "Subworkflow: Topic Management",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 400],
+      "id": "trigger-topic-001",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Topic Management Module\n\nDetects topic shifts and creates summaries when topics change.\n\nOutputs:\n- topic_shift_detected: boolean\n- current_topic_state: object\n- summary_created: boolean",
+        "height": 220,
+        "width": 360,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 140],
+      "id": "note-topic-001",
+      "name": "Module Purpose"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT \n  ts.id,\n  ts.context_id,\n  ts.topic_title,\n  ts.topic_status,\n  ts.message_count,\n  ts.first_message_id,\n  ts.last_message_id\nFROM {{ $json.table_prefix }}topic_state ts\nWHERE ts.context_id = '{{ $json.context_id }}'\nORDER BY ts.id DESC\nLIMIT 1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [650, 400],
+      "id": "postgres-topic-001",
+      "name": "Fetch Topic State"
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Start').first().json;\nconst topicStateRows = $input.all();\nconst latestState = topicStateRows.length > 0 ? topicStateRows[0].json : null;\n\nconst query = `\n  SELECT id, role, message, message_original\n  FROM ${trigger.table_prefix}transcript\n  WHERE context_id = '${trigger.context_id}'\n  ORDER BY created_at DESC\n  LIMIT 2\n`;\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    current_topic_state: latestState,\n    query_for_messages: query\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 400],
+      "id": "code-topic-001",
+      "name": "Prepare Detection"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query_for_messages }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1450, 400],
+      "id": "postgres-topic-002",
+      "name": "Fetch Recent Messages"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze if the conversation topic has shifted.\n\nCurrent topic: {{ $('Prepare Detection').first().json.current_topic_state?.topic_title || 'No topic' }}\n\nRecent conversation:\n{{ $input.all().reverse().map(i => `${i.json.role}: ${i.json.message || i.json.message_original}`).join('\\n') }}\n\nRespond with ONLY valid JSON:\n{\n  \"topic_shifted\": boolean,\n  \"new_topic_title\": \"string (if shifted)\"\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [1850, 400],
+      "id": "agent-topic-001",
+      "name": "Detect Topic Shift"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1850, 620],
+      "id": "llm-topic-001",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiOutput = $input.item.json.output || '{}';\nconst detection = typeof aiOutput === 'string' ? JSON.parse(aiOutput) : aiOutput;\nconst detectionData = $('Prepare Detection').first().json;\n\nreturn [{\n  json: {\n    context_id: detectionData.context_id,\n    table_prefix: detectionData.table_prefix,\n    topic_shifted: detection.topic_shifted || false,\n    new_topic_title: detection.new_topic_title || null,\n    current_state: detectionData.current_topic_state\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 400],
+      "id": "code-topic-002",
+      "name": "Parse Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return topic management results\nconst result = $input.first().json;\n\nreturn [{\n  json: {\n    topic_shift_detected: result.topic_shifted,\n    current_topic_state: result.current_state,\n    summary_created: false,\n    // Pass through for next workflows\n    context_id: result.context_id,\n    table_prefix: result.table_prefix\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2650, 400],
+      "id": "code-topic-003",
+      "name": "Format Output"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Topic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Topic State": {
+      "main": [
+        [
+          {
+            "node": "Prepare Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Detection": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Detect Topic Shift",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Topic Shift": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Detect Topic Shift",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Result": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "topic-management-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

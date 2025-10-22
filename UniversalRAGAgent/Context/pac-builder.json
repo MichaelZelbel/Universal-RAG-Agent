@@ -1,0 +1,257 @@
+{
+  "name": "Chat Bot Memory Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great! Fishing is a wonderful hobby...\",\n  \"context\": \"{\\\"recent_messages\\\":[{\\\"id\\\":1,\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello\\\",\\\"was_truncated\\\":false},{\\\"id\\\":2,\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"hi there\\\",\\\"was_truncated\\\":false}],\\\"long_term_memories\\\":[{\\\"type\\\":\\\"preference\\\",\\\"content\\\":\\\"User likes fishing\\\"}]}\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "id": "trigger-001",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Main Orchestrator\n\nCalls 3 subworkflows:\n1. Topic Management - handles topic detection, shifts, summaries\n2. Context Builder - builds complete context with gap filling\n3. Long-term Memory - extracts and manages long-term facts\n\nEach module is independently testable and can be disabled easily.",
+        "height": 280,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [200, 80],
+      "id": "note-001",
+      "name": "Architecture Notes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// === Configuration ===\nconst MESSAGE_LENGTH_THRESHOLD = 5000;\nconst TRUNCATE_LENGTH = 1000;\nconst TRUNCATION_SUFFIX = '... [truncated] Message Summary: ';\n\n// Get input data\nconst triggerData = $input.first().json;\nconst contextId = triggerData.context_id;\nconst userMessage = triggerData.userMessage;\nconst assistantResponse = triggerData.assistantResponse;\nconst tablePrefix = triggerData.table_prefix;\nconst contextStr = triggerData.context;\n\n// Process messages and prepare for insertion\nconst items = [];\n\nif (typeof userMessage === 'string' && userMessage.trim()) {\n  const originalMessage = userMessage.trim();\n  const messageLength = originalMessage.length;\n  \n  items.push({\n    json: {\n      context_id: contextId,\n      table_prefix: tablePrefix,\n      context: contextStr,\n      role: 'user',\n      message_original: originalMessage,\n      needs_summary: messageLength > MESSAGE_LENGTH_THRESHOLD,\n      message: messageLength <= MESSAGE_LENGTH_THRESHOLD ? originalMessage : null\n    }\n  });\n}\n\nif (typeof assistantResponse === 'string' && assistantResponse.trim()) {\n  const originalMessage = assistantResponse.trim();\n  const messageLength = originalMessage.length;\n  \n  items.push({\n    json: {\n      context_id: contextId,\n      table_prefix: tablePrefix,\n      context: contextStr,\n      role: 'assistant',\n      message_original: originalMessage,\n      needs_summary: messageLength > MESSAGE_LENGTH_THRESHOLD,\n      message: messageLength <= MESSAGE_LENGTH_THRESHOLD ? originalMessage : null\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "id": "code-001",
+      "name": "Prepare Messages"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "={{ $json.table_prefix }}transcript",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $json.context_id }}",
+            "role": "={{ $json.role }}",
+            "message": "={{ $json.message }}",
+            "message_original": "={{ $json.message_original }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "queryBatching": "independently"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1050, 300],
+      "id": "postgres-001",
+      "name": "Insert Messages",
+      "credentials": {
+        "postgres": {
+          "id": "{{ POSTGRES_CREDENTIAL_ID }}",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "{{ TOPIC_MANAGEMENT_WORKFLOW_ID }}",
+          "mode": "name"
+        },
+        "mode": "once"
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1450, 200],
+      "id": "call-001",
+      "name": "📋 Topic Management"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "{{ CONTEXT_BUILDER_WORKFLOW_ID }}",
+          "mode": "name"
+        },
+        "mode": "once"
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1850, 200],
+      "id": "call-002",
+      "name": "📦 Context Builder"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "{{ MEMORY_EXTRACTION_WORKFLOW_ID }}",
+          "mode": "name"
+        },
+        "mode": "once"
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [1850, 400],
+      "id": "call-003",
+      "name": "🧠 Long-term Memory"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list"
+        },
+        "table": {
+          "__rl": true,
+          "value": "={{ $('Start').item.json.table_prefix }}context",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $('Start').item.json.context_id }}",
+            "context": "={{ $json.context }}"
+          }
+        },
+        "onConflict": {
+          "conflictColumns": ["context_id"],
+          "resolveConflict": "update"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2250, 300],
+      "id": "postgres-002",
+      "name": "Upsert Context",
+      "credentials": {
+        "postgres": {
+          "id": "{{ POSTGRES_CREDENTIAL_ID }}",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Subworkflow Outputs:\n\n📋 Topic Management\n- topic_shift_detected (bool)\n- current_topic_state (object)\n- summary_created (bool)\n\n📦 Context Builder\n- complete_context (JSON)\n- gap_filled (bool)\n- transcript_rows (array)\n- summary_rows (array)\n\n🧠 Long-term Memory\n- new_memories (array)\n- removed_memories (array)\n- should_update (bool)",
+        "height": 340,
+        "width": 380,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1380, 560],
+      "id": "note-002",
+      "name": "Subworkflow Outputs"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Prepare Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Messages": {
+      "main": [
+        [
+          {
+            "node": "Insert Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Messages": {
+      "main": [
+        [
+          {
+            "node": "📋 Topic Management",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Topic Management": {
+      "main": [
+        [
+          {
+            "node": "📦 Context Builder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🧠 Long-term Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📦 Context Builder": {
+      "main": [
+        [
+          {
+            "node": "Upsert Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧠 Long-term Memory": {
+      "main": [
+        [
+          {
+            "node": "Upsert Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "main-orchestrator-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
