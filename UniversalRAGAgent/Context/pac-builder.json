@@ -1,5 +1,5 @@
 {
-  "name": "Chat Bot Memory Orchestrator",
+  "name": "PAC Builder",
   "nodes": [
     {
       "parameters": {
@@ -8,8 +8,11 @@
       },
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [250, 300],
-      "id": "trigger-001",
+      "position": [
+        -672,
+        32
+      ],
+      "id": "e5c416c2-e328-4433-948d-2f39fe27d14d",
       "name": "Start"
     },
     {
@@ -21,8 +24,11 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [200, 80],
-      "id": "note-001",
+      "position": [
+        -688,
+        -304
+      ],
+      "id": "62640018-c7bf-40ba-9b99-c9ab22b18bd6",
       "name": "Architecture Notes"
     },
     {
@@ -31,13 +37,15 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [650, 300],
-      "id": "code-001",
+      "position": [
+        -272,
+        32
+      ],
+      "id": "06a0cfd2-3413-4825-8fcc-9b055cc073b6",
       "name": "Prepare Messages"
     },
     {
       "parameters": {
-        "operation": "insert",
         "schema": {
           "__rl": true,
           "value": "public",
@@ -66,12 +74,15 @@
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1050, 300],
-      "id": "postgres-001",
+      "position": [
+        144,
+        32
+      ],
+      "id": "1cb0f67f-13d8-4bc9-91a3-87f98e4db7a0",
       "name": "Insert Messages",
       "credentials": {
         "postgres": {
-          "id": "{{ POSTGRES_CREDENTIAL_ID }}",
+          "id": "p1yb7OdsllaTAj7J",
           "name": "Postgres account"
         }
       }
@@ -80,45 +91,180 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "{{ TOPIC_MANAGEMENT_WORKFLOW_ID }}",
-          "mode": "name"
+          "value": "aCcvSnqrtw4Wvu61",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/aCcvSnqrtw4Wvu61",
+          "cachedResultName": "SSW Topic Management"
         },
-        "mode": "once"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $('Start').first().json.context_id }}",
+            "table_prefix": "={{ $('Start').first().json.table_prefix }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "table_prefix",
+              "displayName": "table_prefix",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1450, 200],
-      "id": "call-001",
+      "position": [
+        576,
+        32
+      ],
+      "id": "fdb100f4-b781-407c-8c1f-65d34f5decaa",
       "name": "📋 Topic Management"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "{{ CONTEXT_BUILDER_WORKFLOW_ID }}",
-          "mode": "name"
+          "value": "qVRUx4zxcejBWFrz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/qVRUx4zxcejBWFrz",
+          "cachedResultName": "SSW Context Builder"
         },
-        "mode": "once"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $('Start').first().json.context_id }}",
+            "table_prefix": "={{ $('Start').first().json.table_prefix }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "table_prefix",
+              "displayName": "table_prefix",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1850, 200],
-      "id": "call-002",
+      "position": [
+        944,
+        -80
+      ],
+      "id": "f2dfd4f7-4fa6-4296-8ff0-140e54e6b6f4",
       "name": "📦 Context Builder"
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "{{ MEMORY_EXTRACTION_WORKFLOW_ID }}",
-          "mode": "name"
+          "value": "U6XLmldA666dEv97",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/U6XLmldA666dEv97",
+          "cachedResultName": "SSW Long Term Memory"
         },
-        "mode": "once"
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context_id": "={{ $('Start').first().json.context_id }}",
+            "table_prefix": "={{ $('Start').first().json.table_prefix }}",
+            "userMessage": "={{ $('Start').first().json.userMessage }}",
+            "assistantResponse": "={{ $('Start').first().json.assistantResponse }}",
+            "context": "={{ $('Start').first().json.context }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "table_prefix",
+              "displayName": "table_prefix",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "userMessage",
+              "displayName": "userMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "assistantResponse",
+              "displayName": "assistantResponse",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1850, 400],
-      "id": "call-003",
+      "position": [
+        944,
+        128
+      ],
+      "id": "f1b4df01-d4b5-4051-91fd-ebec9a0120c4",
       "name": "🧠 Long-term Memory"
     },
     {
@@ -141,19 +287,19 @@
             "context": "={{ $json.context }}"
           }
         },
-        "onConflict": {
-          "conflictColumns": ["context_id"],
-          "resolveConflict": "update"
-        }
+        "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2250, 300],
-      "id": "postgres-002",
+      "position": [
+        1344,
+        32
+      ],
+      "id": "bbbe64c2-e808-4b2b-955c-6c18377ef0c4",
       "name": "Upsert Context",
       "credentials": {
         "postgres": {
-          "id": "{{ POSTGRES_CREDENTIAL_ID }}",
+          "id": "p1yb7OdsllaTAj7J",
           "name": "Postgres account"
         }
       }
@@ -167,11 +313,15 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [1380, 560],
-      "id": "note-002",
+      "position": [
+        464,
+        288
+      ],
+      "id": "77c6a14e-906b-4cfd-9396-cb035de11a39",
       "name": "Subworkflow Outputs"
     }
   ],
+  "pinData": {},
   "connections": {
     "Start": {
       "main": [
@@ -249,9 +399,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "main-orchestrator-v1",
+  "versionId": "b56badc7-61ed-407f-8f13-9b7b83026dc5",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
   },
+  "id": "e7XF3f8ZZCeSZyw0",
   "tags": []
 }
