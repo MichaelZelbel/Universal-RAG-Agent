@@ -1,0 +1,463 @@
+{
+  "name": "SSW Topic Management",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"test123\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I love fishing\",\n  \"assistantResponse\": \"That sounds fun!\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        128
+      ],
+      "id": "383018fe-0b15-4961-a3cb-1bc0de48e1d1",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "content": "Topic Management Module\n\nDetects topic shifts and creates summaries when topics change.\n\nInputs: context_id, table_prefix, userMessage, assistantResponse\nOutputs: topic_shift_detected, current_topic_state",
+        "height": 220,
+        "width": 360,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -144
+      ],
+      "id": "054d6b05-d8ba-48c1-aab1-8d8c184ee0da",
+      "name": "Module Purpose"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  context_id,\n  current_topic_start_id,\n  current_topic_name,\n  messages_in_current_topic,\n  last_check_message_id,\n  created_at,\n  updated_at\nFROM {{ $json.table_prefix }}topic_state\nWHERE context_id = '{{ $json.context_id }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -16,
+        128
+      ],
+      "id": "f227915a-9a79-4c7b-934d-6335a0ec3cbb",
+      "name": "Fetch Topic State",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, role, message, message_original, created_at\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\nORDER BY created_at DESC\nLIMIT 5",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        128
+      ],
+      "id": "393a59ad-8f76-4c1d-8f76-29d998f6982b",
+      "name": "Fetch Recent Messages",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Start').first().json || {};\nconst topicStateRows = $('Fetch Topic State').all();\nconst recentMessages = $input.all().map(i => i.json || {});\n\nconst currentState = topicStateRows.length > 0 ? topicStateRows[0].json : null;\n\n// Format context messages (excluding the last 2 which we just added)\nconst contextMessages = recentMessages\n  .filter(m => m.id)\n  .sort((a, b) => a.id - b.id)\n  .slice(0, -2)\n  .map(m => `${m.role}: ${m.message || m.message_original}`)\n  .join('\\n');\n\nconst newUserMsg = trigger.userMessage || '';\nconst newAssistantMsg = trigger.assistantResponse || '';\n\nconst prompt = `Analyze if this new exchange is a topic shift.\n\nPrevious topic: ${currentState?.current_topic_name || 'No topic yet'}\n\nPrevious context:\n${contextMessages || 'No previous messages'}\n\nNew exchange:\nuser: ${newUserMsg}\nassistant: ${newAssistantMsg}\n\nRespond with ONLY valid JSON:\n{\n  \"is_topic_shift\": true or false,\n  \"confidence\": 0.0 to 1.0,\n  \"new_topic_name\": \"3-5 words\" or null,\n  \"reasoning\": \"one sentence\"\n}\n\nRules: shift = NEW subject. NOT shift = continuation.`;\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    current_state: currentState,\n    detection_prompt: prompt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        128
+      ],
+      "id": "9489172c-eacc-4e03-86f8-cd2b9b6e6b2f",
+      "name": "Prepare Detection"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.detection_prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        128
+      ],
+      "id": "806a4edb-0946-48a7-99e0-21cf9a2703c1",
+      "name": "Detect Topic Shift"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        336
+      ],
+      "id": "1f28eb43-3a98-432a-83a2-bcc28ff6ae0b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prepData = $('Prepare Detection').first().json;\nconst aiOutput = $json.output || '{}';\n\nlet result = { is_topic_shift: false, confidence: 0, new_topic_name: null, reasoning: '' };\ntry {\n  const cleaned = aiOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  result = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Parse failed:', aiOutput);\n}\n\nconst CONFIDENCE_THRESHOLD = 0.7;\nconst isShift = result.is_topic_shift && result.confidence >= CONFIDENCE_THRESHOLD;\n\nconsole.log('=== TOPIC DETECTION ===');\nconsole.log('Shift:', isShift, 'Confidence:', result.confidence);\nconsole.log('Topic:', result.new_topic_name);\n\nreturn [{\n  json: {\n    context_id: prepData.context_id,\n    table_prefix: prepData.table_prefix,\n    topic_shift_detected: isShift,\n    shift_confidence: result.confidence,\n    suggested_topic_name: result.new_topic_name || 'Untitled Topic',\n    shift_reasoning: result.reasoning,\n    current_state: prepData.current_state\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        128
+      ],
+      "id": "3f66b5f4-1c3b-4185-b20e-9dd4c78c51b2",
+      "name": "Process Detection"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH current_state AS (\n  SELECT \n    current_topic_start_id,\n    current_topic_name,\n    messages_in_current_topic\n  FROM {{ $json.table_prefix }}topic_state\n  WHERE context_id = '{{ $json.context_id }}'\n),\nlast_msg AS (\n  SELECT id FROM {{ $json.table_prefix }}chat_transcript\n  WHERE context_id = '{{ $json.context_id }}'\n  ORDER BY created_at DESC LIMIT 1\n)\nINSERT INTO {{ $json.table_prefix }}topic_state\n(context_id, current_topic_start_id, current_topic_name, messages_in_current_topic, last_check_message_id)\nSELECT \n  '{{ $json.context_id }}',\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN (SELECT id FROM last_msg)\n    ELSE COALESCE((SELECT current_topic_start_id FROM current_state), (SELECT id FROM last_msg))\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN '{{ String($json.suggested_topic_name).replace(/'/g, \"''\") }}'\n    ELSE COALESCE((SELECT current_topic_name FROM current_state), 'Initial Topic')\n  END,\n  CASE \n    WHEN {{ $json.topic_shift_detected }}::boolean THEN 1\n    ELSE COALESCE((SELECT messages_in_current_topic + 1 FROM current_state), 1)\n  END,\n  (SELECT id FROM last_msg)\nON CONFLICT (context_id) DO UPDATE SET\n  current_topic_start_id = EXCLUDED.current_topic_start_id,\n  current_topic_name = EXCLUDED.current_topic_name,\n  messages_in_current_topic = EXCLUDED.messages_in_current_topic,\n  last_check_message_id = EXCLUDED.last_check_message_id,\n  updated_at = timezone('utc'::text, now())\nRETURNING \n  (SELECT current_topic_start_id FROM current_state) as previous_topic_start_id,\n  (SELECT current_topic_name FROM current_state) as previous_topic_name,\n  (SELECT messages_in_current_topic FROM current_state) as previous_topic_message_count,\n  current_topic_start_id,\n  context_id,\n  {{ $json.topic_shift_detected }}::boolean as topic_shift_detected;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2000,
+        128
+      ],
+      "id": "update-state",
+      "name": "Update Topic State",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.topic_shift_detected }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.previous_topic_message_count }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        128
+      ],
+      "id": "should-summarize",
+      "name": "Should Create Summary?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, role, message, message_original, created_at\nFROM {{ $('Process Detection').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $json.context_id }}'\n  AND id >= {{ $json.previous_topic_start_id }}\n  AND id < {{ $json.current_topic_start_id }}\nORDER BY created_at ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2800,
+        0
+      ],
+      "id": "fetch-topic-msgs",
+      "name": "Fetch Topic Messages",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stateData = $('Update Topic State').first().json;\nconst messages = $input.all().map(i => i.json);\n\nconst conversation = messages.map(m => {\n  const content = m.message_original || m.message;\n  return `${m.role}: ${content}`;\n}).join('\\n\\n');\n\nconst prompt = `Summarize this conversation topic.\n\nConversation (${messages.length} messages):\n${conversation}\n\nJSON (no markdown):\n{\n  \"topic_title\": \"5-8 words\",\n  \"main_summary\": \"2-3 sentences\",\n  \"key_points\": [\"point 1\", \"point 2\"]\n}`;\n\nreturn [{\n  json: {\n    context_id: stateData.context_id,\n    table_prefix: $('Process Detection').first().json.table_prefix,\n    first_message_id: messages[0].id,\n    last_message_id: messages[messages.length - 1].id,\n    message_count: messages.length,\n    previous_topic_name: stateData.previous_topic_name,\n    summarization_prompt: prompt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        0
+      ],
+      "id": "prepare-summary",
+      "name": "Prepare Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.summarization_prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        3600,
+        0
+      ],
+      "id": "generate-summary",
+      "name": "Generate Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const summaryInput = $('Prepare Summary').first().json;\nconst aiOutput = $json.output || '{}';\n\nlet parsed;\ntry {\n  const cleaned = aiOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsed = JSON.parse(cleaned);\n} catch {\n  parsed = {\n    topic_title: summaryInput.previous_topic_name,\n    main_summary: aiOutput.substring(0, 200),\n    key_points: []\n  };\n}\n\nlet fullSummary = `${parsed.main_summary}\\n\\n`;\nif (parsed.key_points?.length) fullSummary += `Key: ${parsed.key_points.join('; ')}`;\n\nconsole.log('=== SUMMARY CREATED ===');\nconsole.log('Title:', parsed.topic_title);\n\nreturn [{\n  json: {\n    context_id: summaryInput.context_id,\n    table_prefix: summaryInput.table_prefix,\n    topic_title: parsed.topic_title,\n    topic_summary: fullSummary.trim(),\n    first_message_id: summaryInput.first_message_id,\n    last_message_id: summaryInput.last_message_id,\n    message_count: summaryInput.message_count\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        0
+      ],
+      "id": "format-summary",
+      "name": "Format Summary"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $json.table_prefix }}chat_topic_summaries\n(context_id, topic_title, topic_summary, first_message_id, last_message_id, message_count)\nVALUES (\n  '{{ $json.context_id }}',\n  '{{ String($json.topic_title).replace(/'/g, \"''\") }}',\n  '{{ String($json.topic_summary).replace(/'/g, \"''\") }}',\n  {{ $json.first_message_id }},\n  {{ $json.last_message_id }},\n  {{ $json.message_count }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4400,
+        0
+      ],
+      "id": "insert-summary",
+      "name": "Insert Summary",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// No summary needed - pass through state info\nconst stateData = $input.first().json;\n\nconsole.log('=== No Summary Needed ===');\nconsole.log('Topic shift:', stateData.topic_shift_detected);\nconsole.log('Message count:', stateData.previous_topic_message_count);\n\nreturn [{\n  json: {\n    context_id: stateData.context_id,\n    topic_shift_detected: stateData.topic_shift_detected || false,\n    summary_created: false,\n    status: 'complete'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        256
+      ],
+      "id": "no-summary-needed",
+      "name": "No Summary Needed"
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Fetch Topic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Topic State": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Detection": {
+      "main": [
+        [
+          {
+            "node": "Detect Topic Shift",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Topic Shift": {
+      "main": [
+        [
+          {
+            "node": "Process Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Detection": {
+      "main": [
+        [
+          {
+            "node": "Update Topic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Topic State": {
+      "main": [
+        [
+          {
+            "node": "Should Create Summary?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Summary?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Topic Messages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Summary Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Topic Messages": {
+      "main": [
+        [
+          {
+            "node": "Prepare Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Format Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Summary": {
+      "main": [
+        [
+          {
+            "node": "Insert Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Detect Topic Shift",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
