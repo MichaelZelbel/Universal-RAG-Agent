@@ -4,30 +4,17 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Analyze if this conversation contains information worth remembering long-term.\n\nCurrent context:\n={{ $json.context }}\n\nLatest exchange:\nUser: {{ $json.userMessage }}\nAssistant: {{ $json.assistantResponse }}\n\nRespond with ONLY valid JSON:\n{\"should_update\": true, \"new_memories\": [{\"type\": \"preference\", \"content\": \"User likes pizza\"}], \"remove_indices\": []}\n\nOnly create memories for important lasting information (preferences, facts, goals). Not for casual greetings.",
+        "text": "=Analyze if this conversation contains information worth remembering long-term.\n\nEXISTING MEMORIES (do not duplicate these):\n={{ $json.existing_memories_text }}\n\nCurrent context:\n={{ $('Start').first().json.context }}\n\nLatest exchange:\nUser: {{ $('Start').first().json.userMessage }}\nAssistant: {{ $('Start').first().json.assistantResponse }}\n\nRespond with ONLY valid JSON:\n{\"should_update\": true, \"new_memories\": [{\"type\": \"preference\", \"content\": \"User likes pizza\", \"importance\": 7}]}\n\nRules:\n- Only create NEW memories not already in the existing list above\n- Merge similar facts into one (don't create \"cat sneezes\" if \"cat occasionally sneezes\" exists)\n- Only lasting information (preferences, facts, goals). NOT casual greetings or temporary things.\n- If nothing new to remember, set should_update to false\n- Assign importance scores (1-10):\n  * 1-3: Minor details, fleeting mentions\n  * 4-6: Standard facts, preferences\n  * 7-8: Important preferences, significant facts\n  * 9-10: Critical information, core identity, major decisions",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        432,
-        -80
+        -32,
+        -96
       ],
       "id": "acad580d-9772-4f81-af4a-29356b59dc70",
       "name": "Memory Manager"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Build context with all summaries (including gap-filled)\nconst trigger = $('Start').first().json || {};\nconst mergedData = $('Merge Gap Summary').first().json;\nconst transcriptRows = mergedData.transcript_rows || [];\nconst summaryRows = mergedData.summary_rows || [];\n\n// Sort transcript\nconst rows = transcriptRows\n  .filter(r => !r.context_id || String(r.context_id) === String(trigger.context_id))\n  .sort((a, b) => {\n    const ts = v => Date.parse(v || '') || 0;\n    return ts(a.created_at || a.createdAt) - ts(b.created_at || b.createdAt);\n  });\n\n// Format recent messages\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  \n  return {\n    id: r.id,\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original\n  };\n});\n\n// Format summaries (oldest to newest)\nconst topic_summaries = summaryRows.map(s => ({\n  topic_title: s.topic_title || '',\n  summary: s.topic_summary || '',\n  message_range: [s.first_message_id, s.last_message_id],\n  message_count: s.message_count || 0\n}));\n\n// Get long-term memories\nlet long_term_memories = [];\ntry {\n  if (trigger.context && typeof trigger.context === 'string') {\n    const parsed = JSON.parse(trigger.context);\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  } else if (trigger.context && typeof trigger.context === 'object' &&\n             Array.isArray(trigger.context.long_term_memories)) {\n    long_term_memories = trigger.context.long_term_memories;\n  }\n} catch { /* ignore */ }\n\nconst context = { \n  topic_summaries,\n  recent_messages, \n  long_term_memories \n};\n\nreturn [{\n  json: {\n    context_id: String(trigger.context_id || ''),\n    context: JSON.stringify(context),\n    userMessage: String(trigger.userMessage ?? ''),\n    assistantResponse: String(trigger.assistantResponse ?? '')\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        4512,
-        -64
-      ],
-      "id": "a39e126b-decf-496b-88d5-1ecdbb57d931",
-      "name": "Build Next Context"
     },
     {
       "parameters": {
@@ -128,7 +115,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        432,
+        -32,
         160
       ],
       "id": "ef15db6d-f0fa-4745-8a43-629551666853",
@@ -173,8 +160,8 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        1040,
-        -400
+        1248,
+        -656
       ],
       "typeVersion": 1,
       "id": "41f363df-5581-47bd-97d2-d4d1a1864554",
@@ -195,6 +182,7 @@
       "id": "1ea58ca5-a405-4532-900e-d83445f09e0a",
       "name": "Insert Transcript",
       "alwaysOutputData": true,
+      "executeOnce": false,
       "credentials": {
         "postgres": {
           "id": "p1yb7OdsllaTAj7J",
@@ -217,6 +205,7 @@
       "id": "2fb2682a-f4d6-49ce-b3f4-a1a95f3379c6",
       "name": "Fetch Transcript",
       "alwaysOutputData": true,
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "p1yb7OdsllaTAj7J",
@@ -233,12 +222,13 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2576,
+        2496,
         -80
       ],
       "id": "5a89cf5c-e6e2-4210-b965-b74d191946c3",
       "name": "Fetch Topic Summaries",
       "alwaysOutputData": true,
+      "executeOnce": true,
       "credentials": {
         "postgres": {
           "id": "p1yb7OdsllaTAj7J",
@@ -255,8 +245,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        4704,
-        -64
+        5184,
+        -80
       ],
       "id": "cfd97c48-9580-4f78-9e86-fb0982564930",
       "name": "Upsert Context",
@@ -535,7 +525,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2768,
+        2816,
         -80
       ],
       "id": "3b62e171-c629-45ab-8726-0763ffbc1fe2",
@@ -699,8 +689,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -96,
-        144
+        -1056,
+        96
       ],
       "id": "6e80b654-11a8-4fcf-8a1d-5e2ad6727e94",
       "name": "When clicking ‘Execute workflow’"
@@ -713,8 +703,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -96,
-        -80
+        -1072,
+        -96
       ],
       "id": "f9528f43-2883-49ec-9d60-ed74c71a703b",
       "name": "Entry"
@@ -760,8 +750,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        272,
-        -80
+        -640,
+        -96
       ],
       "id": "6fdc471c-37c9-409b-9ab9-d885823b2f74",
       "name": "Start"
@@ -785,13 +775,13 @@
             {
               "id": "5ba76ac2-3f1c-48ab-8770-567267ca2f71",
               "name": "userMessage",
-              "value": "My cat is sneezing sometimes.",
+              "value": "My cat is 5 years old",
               "type": "string"
             },
             {
               "id": "cb2f476d-0726-4a7a-95a8-42a9e6630428",
               "name": "assistantResponse",
-              "value": "I'm sorry to hear your cat is sneezing.",
+              "value": "How beautiful!",
               "type": "string"
             },
             {
@@ -807,21 +797,21 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        80,
-        144
+        -880,
+        96
       ],
       "id": "d39418cd-3dd8-4491-bfdd-da89df415424",
       "name": "Test Values"
     },
     {
       "parameters": {
-        "jsCode": "// Parse AI output and prepare memories for storage\nconst trigger = $('Start').first().json;\nconst aiOutput = $json.output || '{}';\n\n// Parse the AI response\nlet memoryUpdate;\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse memory update:', aiOutput);\n  memoryUpdate = { should_update: false, new_memories: [], remove_indices: [] };\n}\n\n// Check if we should update memories\nif (!memoryUpdate.should_update || !memoryUpdate.new_memories || memoryUpdate.new_memories.length === 0) {\n  console.log('No new memories to store');\n  return [{\n    json: {\n      context_id: trigger.context_id,\n      table_prefix: trigger.table_prefix,\n      has_new_memories: false,\n      new_memories: [],\n      userMessage: trigger.userMessage,\n      assistantResponse: trigger.assistantResponse\n    }\n  }];\n}\n\n// Prepare memories for insertion\nconst memories = memoryUpdate.new_memories.map(m => ({\n  context_id: trigger.context_id,\n  table_prefix: trigger.table_prefix,\n  memory_type: m.type || 'fact',\n  content: m.content,\n  importance_score: m.importance || 5, // Default to medium importance\n  userMessage: trigger.userMessage,\n  assistantResponse: trigger.assistantResponse\n}));\n\nconsole.log('=== MEMORY UPDATE ===');\nconsole.log('New memories:', memories.length);\nmemories.forEach(m => console.log(`  - [${m.memory_type}] ${m.content}`));\nconsole.log('====================');\n\nreturn memories.map(m => ({ json: m }));"
+        "jsCode": "// Parse AI output and prepare memories for storage\nconst trigger = $('Start').first().json;\nconst aiOutput = $json.output || '{}';\n\n// Parse the AI response\nlet memoryUpdate;\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse memory update:', aiOutput);\n  memoryUpdate = { should_update: false, new_memories: [] };\n}\n\n// CRITICAL: Check if we should update memories\nif (!memoryUpdate.should_update || \n    !Array.isArray(memoryUpdate.new_memories) || \n    memoryUpdate.new_memories.length === 0) {\n  console.log('No new memories to store');\n  // Return empty array - stops the flow here\n  return [];\n}\n\n// Filter out invalid memories\nconst validMemories = memoryUpdate.new_memories.filter(m => \n  m && m.content && m.content.trim() !== '' && m.content !== 'undefined'\n);\n\nif (validMemories.length === 0) {\n  console.log('No valid memories after filtering');\n  return [];\n}\n\n// Prepare memories for insertion\nconst memories = validMemories.map(m => ({\n  context_id: trigger.context_id,\n  table_prefix: trigger.table_prefix,\n  memory_type: m.type || 'fact',\n  content: m.content.trim(),\n  importance_score: m.importance || 5,\n  userMessage: trigger.userMessage,\n  assistantResponse: trigger.assistantResponse\n}));\n\nconsole.log('=== MEMORY UPDATE ===');\nconsole.log('Valid memories:', memories.length);\nmemories.forEach(m => console.log(`  - [${m.memory_type}] ${m.content}`));\nconsole.log('====================');\n\nreturn memories.map(m => ({ json: m }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        736,
-        -80
+        288,
+        -96
       ],
       "id": "1bda94cc-e0e8-462d-9fa8-a65e5f2a05b6",
       "name": "Parse Memory Updates",
@@ -830,14 +820,14 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}long_term_memories\n(context_id, memory_type, content, importance_score)\nVALUES (\n  '{{ String($json.context_id).replace(/'/g, \"''\") }}',\n  '{{ String($json.memory_type).replace(/'/g, \"''\") }}',\n  '{{ String($json.content).replace(/'/g, \"''\") }}',\n  {{ $json.importance_score || 5 }}\n);",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}long_term_memories\n(context_id, memory_type, content, importance_score)\nVALUES (\n  '{{ String($('Start').first().json.context_id).replace(/'/g, \"''\") }}',\n  '{{ String($json.memory_type || \"fact\").replace(/'/g, \"''\") }}',\n  '{{ String($json.content || \"\").replace(/'/g, \"''\") }}',\n  {{ $json.importance_score || 5 }}\n);",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        912,
-        -80
+        880,
+        -208
       ],
       "id": "c436acff-2878-47a4-86d2-6c875b5e4c14",
       "name": "Store Memories",
@@ -848,6 +838,183 @@
           "name": "Postgres account"
         }
       }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  memory_type,\n  content,\n  importance_score,\n  reference_count,\n  created_at\nFROM {{ $('Start').first().json.table_prefix }}long_term_memories\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\nORDER BY \n  importance_score DESC,\n  created_at DESC\nLIMIT 20;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -416,
+        -96
+      ],
+      "id": "a2e88ed1-8c16-4599-9021-424ad9b835b9",
+      "name": "Fetch Relevant Memories",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare all memories for the Memory Manager prompt\nconst trigger = $('Start').first().json;\nconst existingMemories = $input.all().map(i => i.json);\n\n// Format memories for the prompt\nconst memoryList = existingMemories.length > 0\n  ? existingMemories.map(m => `- [${m.memory_type}] ${m.content}`).join('\\n')\n  : 'None yet';\n\n// Pass everything as ONE item to Memory Manager\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    userMessage: trigger.userMessage,\n    assistantResponse: trigger.assistantResponse,\n    context: trigger.context,\n    existing_memories_text: memoryList,\n    existing_memories_count: existingMemories.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        -96
+      ],
+      "id": "8825df51-b5ee-49c7-935b-275fa6e133c5",
+      "name": "Prepare Memory Context",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "94668683-2746-430b-8ff4-b892546f956b",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        688,
+        -96
+      ],
+      "id": "7df854d0-6bed-47ea-ae6c-7515ec2185af",
+      "name": "Has Memories to Store?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const newMemories = $input.all().map(i => i.json);\n\nlet existingMemories = [];\ntry {\n  existingMemories = $('Fetch Relevant Memories').all()\n    .map(i => i.json)\n    .filter(m => m && m.content);\n} catch (e) {\n  console.log('No existing memories to compare');\n}\n\nfunction isSimilar(text1, text2) {\n  if (!text1 || !text2) return false;\n  \n  const normalize = (text) => {\n    if (!text || typeof text !== 'string') return '';\n    return text.toLowerCase().trim().replace(/[^\\w\\s]/g, '');\n  };\n  \n  const a = normalize(text1);\n  const b = normalize(text2);\n  \n  if (!a || !b) return false;\n  if (a === b) return true;\n  \n  const wordsA = new Set(a.split(/\\s+/).filter(w => w.length > 3));\n  const wordsB = new Set(b.split(/\\s+/).filter(w => w.length > 3));\n  const intersection = new Set([...wordsA].filter(x => wordsB.has(x)));\n  const union = new Set([...wordsA, ...wordsB]);\n  \n  if (union.size === 0) return false;\n  return intersection.size / union.size > 0.75;\n}\n\nconst deduplicated = newMemories.filter(newMem => {\n  if (!newMem || !newMem.content) return false;\n  \n  const isDuplicate = existingMemories.some(existing => \n    isSimilar(newMem.content, existing.content)\n  );\n  \n  if (isDuplicate) {\n    console.log('Skipping duplicate:', newMem.content);\n  }\n  \n  return !isDuplicate;\n});\n\nconsole.log('=== DEDUPLICATION ===');\nconsole.log('New memories:', newMemories.length);\nconsole.log('After dedup:', deduplicated.length);\nconsole.log('Duplicates removed:', newMemories.length - deduplicated.length);\nconsole.log('====================');\n\nreturn deduplicated.map(m => ({ json: m }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        -96
+      ],
+      "id": "f121a0d6-905e-44ff-b72e-abb0813ccd26",
+      "name": "Deduplicate Memories",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, role, message, message_original, created_at\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\nORDER BY created_at DESC\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4576,
+        -384
+      ],
+      "id": "ddab586b-2860-4756-9ed4-fdcbcff7d8fa",
+      "name": "Fetch Recent Transcript",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT topic_title, topic_summary, first_message_id, last_message_id, message_count\nFROM {{ $('Start').first().json.table_prefix }}chat_topic_summaries\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\nORDER BY last_message_id DESC\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4576,
+        -224
+      ],
+      "id": "9d740b6d-ba31-4ee8-b4d5-b47b69ce9025",
+      "name": "Fetch All Summaries",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, memory_type, content, importance_score, created_at\nFROM {{ $('Start').first().json.table_prefix }}long_term_memories\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\n  AND content IS NOT NULL\n  AND content != 'undefined'\nORDER BY importance_score DESC, created_at DESC\nLIMIT 20;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4576,
+        -64
+      ],
+      "id": "aa31819f-4c1d-4a83-88dd-f92447cfe59c",
+      "name": "Fetch All Memories",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        4832,
+        -112
+      ],
+      "id": "62929324-58fe-4de2-aba2-78c5f553b2c5",
+      "name": "Merge All Context Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build context from freshly fetched DB data\nconst trigger = $('Start').first().json || {};\n\n// Get transcript data\nconst transcriptRows = $('Fetch Recent Transcript').all()\n  .map(i => i.json)\n  .filter(r => r && r.id);\n\n// Get summary data\nconst summaryRows = $('Fetch All Summaries').all()\n  .map(i => i.json)\n  .filter(s => s && s.topic_title && s.topic_summary);\n\n// Get memory data\nconst memoryRows = $('Fetch All Memories').all()\n  .map(i => i.json)\n  .filter(m => m && m.content && m.content !== 'undefined');\n\n// Sort transcript chronologically (oldest to newest)\nconst rows = transcriptRows.sort((a, b) => {\n  const ts = v => Date.parse(v || '') || 0;\n  return ts(a.created_at) - ts(b.created_at);\n});\n\n// Format recent messages\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  \n  return {\n    id: r.id,\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original\n  };\n});\n\n// Format summaries (oldest to newest)\nconst topic_summaries = summaryRows\n  .sort((a, b) => (a.first_message_id || 0) - (b.first_message_id || 0))\n  .map(s => ({\n    topic_title: s.topic_title,\n    summary: s.topic_summary,\n    message_range: [s.first_message_id, s.last_message_id],\n    message_count: s.message_count || 0\n  }));\n\n// Format memories (deduplicate by content)\nconst seenContent = new Set();\nconst long_term_memories = memoryRows\n  .filter(m => {\n    if (seenContent.has(m.content)) return false;\n    seenContent.add(m.content);\n    return true;\n  })\n  .map(m => ({\n    type: m.memory_type || 'fact',\n    content: m.content,\n    importance: m.importance_score || 5\n  }));\n\nconsole.log('=== CONTEXT BUILT FROM DB ===');\nconsole.log('Recent messages:', recent_messages.length);\nconsole.log('Topic summaries:', topic_summaries.length);\nconsole.log('Long-term memories:', long_term_memories.length);\nconsole.log('============================');\n\nconst context = { \n  topic_summaries,\n  recent_messages, \n  long_term_memories \n};\n\nreturn [{\n  json: {\n    context_id: String(trigger.context_id || ''),\n    context: JSON.stringify(context)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5024,
+        -80
+      ],
+      "id": "5f7222b6-f7f7-4c34-a4fe-c5cd2659e0a0",
+      "name": "Build Next Context1"
     }
   ],
   "pinData": {},
@@ -857,17 +1024,6 @@
         [
           {
             "node": "Parse Memory Updates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Next Context": {
-      "main": [
-        [
-          {
-            "node": "Upsert Context",
             "type": "main",
             "index": 0
           }
@@ -1227,7 +1383,17 @@
       "main": [
         [
           {
-            "node": "Build Next Context",
+            "node": "Fetch Recent Transcript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch All Summaries",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch All Memories",
             "type": "main",
             "index": 0
           }
@@ -1271,7 +1437,7 @@
       "main": [
         [
           {
-            "node": "Memory Manager",
+            "node": "Fetch Relevant Memories",
             "type": "main",
             "index": 0
           }
@@ -1293,7 +1459,7 @@
       "main": [
         [
           {
-            "node": "Store Memories",
+            "node": "Deduplicate Memories",
             "type": "main",
             "index": 0
           }
@@ -1310,13 +1476,119 @@
           }
         ]
       ]
+    },
+    "Fetch Relevant Memories": {
+      "main": [
+        [
+          {
+            "node": "Prepare Memory Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Memory Context": {
+      "main": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Memories to Store?": {
+      "main": [
+        [
+          {
+            "node": "Store Memories",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate Memories": {
+      "main": [
+        [
+          {
+            "node": "Has Memories to Store?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Transcript": {
+      "main": [
+        [
+          {
+            "node": "Merge All Context Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All Summaries": {
+      "main": [
+        [
+          {
+            "node": "Merge All Context Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fetch All Memories": {
+      "main": [
+        [
+          {
+            "node": "Merge All Context Data",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge All Context Data": {
+      "main": [
+        [
+          {
+            "node": "Build Next Context1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Next Context1": {
+      "main": [
+        [
+          {
+            "node": "Upsert Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "d2ba552a-272d-42cb-a126-16d87dfd0729",
+  "versionId": "1e85042b-818b-46f9-88a2-bf1ef2064a6e",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
