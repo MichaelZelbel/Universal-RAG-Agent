@@ -10,7 +10,7 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        688,
+        432,
         -80
       ],
       "id": "acad580d-9772-4f81-af4a-29356b59dc70",
@@ -36,7 +36,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1040,
+        1072,
         -80
       ],
       "id": "0f0e0f4f-b7ad-4726-aedd-592f7d28cdd8",
@@ -128,7 +128,7 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        688,
+        432,
         160
       ],
       "id": "ef15db6d-f0fa-4745-8a43-629551666853",
@@ -699,7 +699,7 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        160,
+        -96,
         144
       ],
       "id": "6e80b654-11a8-4fcf-8a1d-5e2ad6727e94",
@@ -713,7 +713,7 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        160,
+        -96,
         -80
       ],
       "id": "f9528f43-2883-49ec-9d60-ed74c71a703b",
@@ -726,7 +726,7 @@
             {
               "id": "0eec5cdd-dd64-4e0a-aa6f-9c50e2c7c878",
               "name": "=context_id",
-              "value": "{{ $json.context_id }}",
+              "value": "={{ $json.context_id }}",
               "type": "string"
             },
             {
@@ -760,7 +760,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        528,
+        272,
         -80
       ],
       "id": "6fdc471c-37c9-409b-9ab9-d885823b2f74",
@@ -807,11 +807,47 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        336,
+        80,
         144
       ],
       "id": "d39418cd-3dd8-4491-bfdd-da89df415424",
       "name": "Test Values"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI output and prepare memories for storage\nconst trigger = $('Start').first().json;\nconst aiOutput = $json.output || '{}';\n\n// Parse the AI response\nlet memoryUpdate;\ntry {\n  const cleaned = aiOutput\n    .replace(/```json\\n?/g, '')\n    .replace(/```\\n?/g, '')\n    .trim();\n  memoryUpdate = JSON.parse(cleaned);\n} catch (e) {\n  console.log('Failed to parse memory update:', aiOutput);\n  memoryUpdate = { should_update: false, new_memories: [], remove_indices: [] };\n}\n\n// Check if we should update memories\nif (!memoryUpdate.should_update || !memoryUpdate.new_memories || memoryUpdate.new_memories.length === 0) {\n  console.log('No new memories to store');\n  return [{\n    json: {\n      context_id: trigger.context_id,\n      table_prefix: trigger.table_prefix,\n      has_new_memories: false,\n      new_memories: [],\n      userMessage: trigger.userMessage,\n      assistantResponse: trigger.assistantResponse\n    }\n  }];\n}\n\n// Prepare memories for insertion\nconst memories = memoryUpdate.new_memories.map(m => ({\n  context_id: trigger.context_id,\n  table_prefix: trigger.table_prefix,\n  memory_type: m.type || 'fact',\n  content: m.content,\n  importance_score: m.importance || 5, // Default to medium importance\n  userMessage: trigger.userMessage,\n  assistantResponse: trigger.assistantResponse\n}));\n\nconsole.log('=== MEMORY UPDATE ===');\nconsole.log('New memories:', memories.length);\nmemories.forEach(m => console.log(`  - [${m.memory_type}] ${m.content}`));\nconsole.log('====================');\n\nreturn memories.map(m => ({ json: m }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -80
+      ],
+      "id": "1bda94cc-e0e8-462d-9fa8-a65e5f2a05b6",
+      "name": "Parse Memory Updates",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}long_term_memories\n(context_id, memory_type, content, importance_score)\nVALUES (\n  '{{ String($json.context_id).replace(/'/g, \"''\") }}',\n  '{{ String($json.memory_type).replace(/'/g, \"''\") }}',\n  '{{ String($json.content).replace(/'/g, \"''\") }}',\n  {{ $json.importance_score || 5 }}\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        912,
+        -80
+      ],
+      "id": "c436acff-2878-47a4-86d2-6c875b5e4c14",
+      "name": "Store Memories",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -820,7 +856,7 @@
       "main": [
         [
           {
-            "node": "Prepare Messages",
+            "node": "Parse Memory Updates",
             "type": "main",
             "index": 0
           }
@@ -1252,13 +1288,35 @@
           }
         ]
       ]
+    },
+    "Parse Memory Updates": {
+      "main": [
+        [
+          {
+            "node": "Store Memories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Memories": {
+      "main": [
+        [
+          {
+            "node": "Prepare Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "996f43b6-a724-4af5-8a2c-36f8c5781af7",
+  "versionId": "d2ba552a-272d-42cb-a126-16d87dfd0729",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
