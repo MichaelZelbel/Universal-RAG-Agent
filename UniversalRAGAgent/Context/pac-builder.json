@@ -9,10 +9,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -672,
+        -528,
         32
       ],
-      "id": "e5c416c2-e328-4433-948d-2f39fe27d14d",
+      "id": "a4a8b900-c0df-43ad-a93e-701fc2f4128b",
       "name": "Start"
     },
     {
@@ -25,10 +25,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -688,
-        -304
+        -544,
+        -320
       ],
-      "id": "62640018-c7bf-40ba-9b99-c9ab22b18bd6",
+      "id": "9ef6b936-8801-40b1-8efb-e798bd1340d8",
       "name": "Architecture Notes"
     },
     {
@@ -38,10 +38,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -272,
+        -128,
         32
       ],
-      "id": "06a0cfd2-3413-4825-8fcc-9b055cc073b6",
+      "id": "5cb51ea1-1c01-4f4b-8b21-9ccd1538e820",
       "name": "Prepare Messages"
     },
     {
@@ -54,19 +54,106 @@
         },
         "table": {
           "__rl": true,
-          "value": "={{ $json.table_prefix }}transcript",
+          "value": "={{ $json.table_prefix }}chat_transcript",
           "mode": "name"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "context_id": "={{ $json.context_id }}",
+            "context_id": "{{ $('Start').first().json.context_id }}",
             "role": "={{ $json.role }}",
-            "message": "={{ $json.message }}",
-            "message_original": "={{ $json.message_original }}"
+            "message": "{{ $json.message }}",
+            "message_original": "{ $json.message_original }}"
           },
-          "matchingColumns": [],
-          "schema": []
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "context_id",
+              "displayName": "context_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_length",
+              "displayName": "message_length",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_original",
+              "displayName": "message_original",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_original_length",
+              "displayName": "message_original_length",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {
           "queryBatching": "independently"
@@ -75,10 +162,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        144,
+        288,
         32
       ],
-      "id": "1cb0f67f-13d8-4bc9-91a3-87f98e4db7a0",
+      "id": "9b27a561-2d6c-420f-8bd1-d2c8ac3dd2e6",
       "name": "Insert Messages",
       "credentials": {
         "postgres": {
@@ -100,7 +187,9 @@
           "mappingMode": "defineBelow",
           "value": {
             "context_id": "={{ $('Start').first().json.context_id }}",
-            "table_prefix": "={{ $('Start').first().json.table_prefix }}"
+            "table_prefix": "={{ $('Start').first().json.table_prefix }}",
+            "userMessage": "={{ $('Start').first().json.userMessage }}",
+            "assistantResponse": "={{ $('Start').first().json.assistantResponse }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -121,21 +210,41 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "string"
+            },
+            {
+              "id": "userMessage",
+              "displayName": "userMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "assistantResponse",
+              "displayName": "assistantResponse",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": true
         },
-        "options": {}
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        576,
+        720,
         32
       ],
-      "id": "fdb100f4-b781-407c-8c1f-65d34f5decaa",
-      "name": "📋 Topic Management"
+      "id": "32f07ff9-3ba2-45f5-a042-85eac2385ad1",
+      "name": "\ud83d\udccb Topic Management"
     },
     {
       "parameters": {
@@ -150,7 +259,10 @@
           "mappingMode": "defineBelow",
           "value": {
             "context_id": "={{ $('Start').first().json.context_id }}",
-            "table_prefix": "={{ $('Start').first().json.table_prefix }}"
+            "table_prefix": "={{ $('Start').first().json.table_prefix }}",
+            "context": "={{ $('Start').first().json.context }}",
+            "userMessage": "={{ $('Start').first().json.userMessage }}",
+            "assistantResponse": "={{ $('Start').first().json.assistantResponse }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -171,21 +283,50 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "string"
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "userMessage",
+              "displayName": "userMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "assistantResponse",
+              "displayName": "assistantResponse",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": true
         },
-        "options": {}
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        944,
-        -80
+        1088,
+        -96
       ],
-      "id": "f2dfd4f7-4fa6-4296-8ff0-140e54e6b6f4",
-      "name": "📦 Context Builder"
+      "id": "117435e0-bb69-4db9-854d-493118b613c4",
+      "name": "\ud83d\udce6 Context Builder"
     },
     {
       "parameters": {
@@ -251,51 +392,64 @@
               "display": true,
               "canBeUsedToMatch": true,
               "type": "string"
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "userMessage",
+              "displayName": "userMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "assistantResponse",
+              "displayName": "assistantResponse",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
             }
           ],
           "attemptToConvertTypes": false,
           "convertFieldsToString": true
         },
-        "options": {}
+        "options": {
+          "waitForSubWorkflow": true
+        }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
       "position": [
-        944,
+        1088,
         128
       ],
-      "id": "f1b4df01-d4b5-4051-91fd-ebec9a0120c4",
-      "name": "🧠 Long-term Memory"
+      "id": "bc3aef43-8e02-49e3-963d-ecaa76cd2e8e",
+      "name": "\ud83e\udde0 Long-term Memory"
     },
     {
       "parameters": {
-        "operation": "upsert",
-        "schema": {
-          "__rl": true,
-          "value": "public",
-          "mode": "list"
-        },
-        "table": {
-          "__rl": true,
-          "value": "={{ $('Start').item.json.table_prefix }}context",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "context_id": "={{ $('Start').item.json.context_id }}",
-            "context": "={{ $json.context }}"
-          }
-        },
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Start').first().json.table_prefix }}chat_contexts\n(context_id, context)\nVALUES (\n  '{{ $('Start').first().json.context_id }}',\n  COALESCE(\n    NULLIF($$\n      {{ $('\ud83d\udce6 Context Builder').first().json.context }}\n    $$, '')::jsonb,\n    '{}'::jsonb\n  )\n)\nON CONFLICT (context_id) DO UPDATE SET\n  context    = EXCLUDED.context,\n  updated_at = timezone('utc'::text, now());",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
       "position": [
-        1344,
+        1488,
         32
       ],
-      "id": "bbbe64c2-e808-4b2b-955c-6c18377ef0c4",
+      "id": "5fa0ed57-e9a3-44d7-aa82-6a479d1c3952",
       "name": "Upsert Context",
       "credentials": {
         "postgres": {
@@ -306,7 +460,7 @@
     },
     {
       "parameters": {
-        "content": "Subworkflow Outputs:\n\n📋 Topic Management\n- topic_shift_detected (bool)\n- current_topic_state (object)\n- summary_created (bool)\n\n📦 Context Builder\n- complete_context (JSON)\n- gap_filled (bool)\n- transcript_rows (array)\n- summary_rows (array)\n\n🧠 Long-term Memory\n- new_memories (array)\n- removed_memories (array)\n- should_update (bool)",
+        "content": "Subworkflow Outputs:\n\n\ud83d\udccb Topic Management\n- topic_shift_detected (bool)\n- current_topic_state (object)\n- summary_created (bool)\n\n\ud83d\udce6 Context Builder\n- complete_context (JSON)\n- gap_filled (bool)\n- transcript_rows (array)\n- summary_rows (array)\n\n\ud83e\udde0 Long-term Memory\n- new_memories (array)\n- removed_memories (array)\n- should_update (bool)",
         "height": 340,
         "width": 380,
         "color": 5
@@ -314,10 +468,10 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        464,
+        608,
         288
       ],
-      "id": "77c6a14e-906b-4cfd-9396-cb035de11a39",
+      "id": "0108ae8e-cfa2-43c5-b061-2e1d3650e89e",
       "name": "Subworkflow Outputs"
     }
   ],
@@ -349,30 +503,30 @@
       "main": [
         [
           {
-            "node": "📋 Topic Management",
+            "node": "\ud83d\udccb Topic Management",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📋 Topic Management": {
+    "\ud83d\udccb Topic Management": {
       "main": [
         [
           {
-            "node": "📦 Context Builder",
+            "node": "\ud83d\udce6 Context Builder",
             "type": "main",
             "index": 0
           },
           {
-            "node": "🧠 Long-term Memory",
+            "node": "\ud83e\udde0 Long-term Memory",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "📦 Context Builder": {
+    "\ud83d\udce6 Context Builder": {
       "main": [
         [
           {
@@ -383,7 +537,7 @@
         ]
       ]
     },
-    "🧠 Long-term Memory": {
+    "\ud83e\udde0 Long-term Memory": {
       "main": [
         [
           {
@@ -399,7 +553,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "b56badc7-61ed-407f-8f13-9b7b83026dc5",
+  "versionId": "ad471c11-debc-4daf-a9d3-cf538680ad5f",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"

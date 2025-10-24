@@ -1,5 +1,5 @@
 {
-  "name": "Subworkflow: Context Builder",
+  "name": "SSW Context Builder",
   "nodes": [
     {
       "parameters": {
@@ -8,8 +8,11 @@
       },
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [250, 400],
-      "id": "trigger-context-001",
+      "position": [
+        -3280,
+        112
+      ],
+      "id": "ba3d4bff-b673-42df-bd1b-2b781e4b865c",
       "name": "Start"
     },
     {
@@ -21,101 +24,160 @@
       },
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [200, 120],
-      "id": "note-context-001",
+      "position": [
+        -3328,
+        -176
+      ],
+      "id": "12f1e3e0-f86d-46fb-a9a2-9b3dd4a23b85",
       "name": "Module Purpose"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT * FROM {{ $json.table_prefix }}transcript\nWHERE context_id = '{{ $json.context_id }}'\nORDER BY created_at ASC",
+        "query": "SELECT id, context_id, role, message, message_original, created_at, updated_at\nFROM {{ $json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $json.context_id }}'\nORDER BY created_at DESC\nLIMIT 10",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [650, 400],
-      "id": "postgres-context-001",
-      "name": "Fetch Transcript"
+      "position": [
+        -2880,
+        112
+      ],
+      "id": "c14adf94-f20f-405b-94d4-f76aa45b3f67",
+      "name": "Fetch Transcript",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT * FROM {{ $('Start').item.json.table_prefix }}topic_summary\nWHERE context_id = '{{ $('Start').item.json.context_id }}'\nORDER BY created_at ASC",
+        "query": "SELECT id, topic_title, topic_summary, first_message_id, last_message_id, message_count, created_at\nFROM {{ $('Start').first().json.table_prefix }}chat_topic_summaries\nWHERE context_id = '{{ $('Start').first().json.context_id }}'\n  AND last_message_id < (\n    SELECT MIN(id) FROM (\n      SELECT id FROM {{ $('Start').first().json.table_prefix }}chat_transcript\n      WHERE context_id = '{{ $('Start').first().json.context_id }}'\n      ORDER BY created_at DESC LIMIT 10\n    ) recent\n  )\nORDER BY last_message_id DESC\nLIMIT 10",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [650, 600],
-      "id": "postgres-context-002",
-      "name": "Fetch Summaries"
+      "position": [
+        -2880,
+        304
+      ],
+      "id": "722cd48c-9a2b-4f82-8983-c6629ab6a301",
+      "name": "Fetch Summaries",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
-      "position": [1050, 500],
-      "id": "merge-context-001",
+      "position": [
+        -2480,
+        208
+      ],
+      "id": "515590ec-37f2-483f-b80e-da684d288cdb",
       "name": "Merge Data"
     },
     {
       "parameters": {
-        "jsCode": "// Detect gaps in conversation coverage\nconst transcriptData = $('Fetch Transcript').all().map(i => i.json);\nconst summaryData = $('Fetch Summaries').all().map(i => i.json);\nconst trigger = $('Start').first().json;\n\n// Build set of message IDs covered by summaries\nconst coveredIds = new Set();\nsummaryData.forEach(s => {\n  const first = s.first_message_id;\n  const last = s.last_message_id;\n  for (let id = first; id <= last; id++) {\n    coveredIds.add(id);\n  }\n});\n\n// Find gaps\nconst gaps = [];\nlet gapStart = null;\n\nfor (const msg of transcriptData) {\n  if (!coveredIds.has(msg.id)) {\n    if (gapStart === null) {\n      gapStart = msg.id;\n    }\n  } else {\n    if (gapStart !== null) {\n      gaps.push({\n        start_id: gapStart,\n        end_id: msg.id - 1\n      });\n      gapStart = null;\n    }\n  }\n}\n\n// Check for trailing gap\nif (gapStart !== null && transcriptData.length > 0) {\n  gaps.push({\n    start_id: gapStart,\n    end_id: transcriptData[transcriptData.length - 1].id\n  });\n}\n\nconst largestGap = gaps.length > 0 ? gaps[0] : null;\nconst shouldFillGap = largestGap !== null && \n                      (largestGap.end_id - largestGap.start_id + 1) >= 3;\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    transcript_rows: transcriptData,\n    summary_rows: summaryData,\n    gap_detected: largestGap !== null,\n    should_fill_gap: shouldFillGap,\n    gap: largestGap\n  }\n}];"
+        "jsCode": "// Detect gaps between summaries and recent messages\nconst trigger = $('Start').first().json || {};\nconst summaryRows = $('Fetch Summaries').all().map(i => i.json || {});\nconst transcriptRows = $('Fetch Transcript').all().map(i => i.json || {});\n\nconst sortedTranscript = transcriptRows.filter(r => r.id).sort((a, b) => a.id - b.id);\nconst oldestRecentMessageId = sortedTranscript.length > 0 ? sortedTranscript[0].id : 999999;\nconst lastSummaryEndId = summaryRows.length > 0 ? Math.max(...summaryRows.map(s => s.last_message_id || 0)) : 0;\n\nconst gapStart = lastSummaryEndId + 1;\nconst gapEnd = oldestRecentMessageId - 1;\nconst gapSize = gapEnd - gapStart + 1;\nconst hasGap = gapSize >= 3 && lastSummaryEndId > 0;\n\nconsole.log('=== GAP CHECK ===');\nconsole.log('Has gap:', hasGap, 'Size:', gapSize);\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    has_gap: hasGap,\n    gap_start_id: gapStart,\n    gap_end_id: gapEnd,\n    gap: hasGap ? { start_id: gapStart, end_id: gapEnd } : null,\n    summary_rows: summaryRows,\n    transcript_rows: transcriptRows,\n    trigger_context: trigger.context\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1450, 500],
-      "id": "code-context-001",
+      "position": [
+        -2080,
+        208
+      ],
+      "id": "76fa207f-191d-4a9e-a41e-632aa63bf46f",
       "name": "Detect Gap"
     },
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
             {
-              "value1": "={{ $json.should_fill_gap }}",
-              "value2": true
+              "leftValue": "={{ $json.has_gap }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [1850, 500],
-      "id": "if-context-001",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        208
+      ],
+      "id": "f59fa0a4-27c9-4b82-90cf-c6ebbef04013",
       "name": "Should Fill Gap?"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "=SELECT * FROM {{ $json.table_prefix }}transcript\nWHERE context_id = '{{ $json.context_id }}'\nAND id >= {{ $json.gap.start_id }}\nAND id <= {{ $json.gap.end_id }}\nORDER BY created_at ASC",
+        "query": "SELECT id, role, message, message_original, created_at\nFROM {{ $json.table_prefix }}chat_transcript\nWHERE context_id = '{{ $json.context_id }}'\n  AND id >= {{ $json.gap.start_id }}\n  AND id <= {{ $json.gap.end_id }}\nORDER BY created_at ASC",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2250, 380],
-      "id": "postgres-context-003",
-      "name": "Fetch Gap Messages"
+      "position": [
+        -1280,
+        80
+      ],
+      "id": "096ab8b3-d213-49f3-bb0d-f783620e2a53",
+      "name": "Fetch Gap Messages",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Prepare gap messages for summarization\nconst gapMessages = $input.all().map(i => i.json);\nconst gapData = $('Detect Gap').first().json;\n\nconst formatted = gapMessages\n  .map(m => `${m.role}: ${m.message || m.message_original}`)\n  .join('\\n\\n');\n\nreturn [{\n  json: {\n    context_id: gapData.context_id,\n    table_prefix: gapData.table_prefix,\n    gap_messages: formatted,\n    first_message_id: gapData.gap.start_id,\n    last_message_id: gapData.gap.end_id,\n    message_count: gapMessages.length,\n    topic_title: 'Gap Fill'\n  }\n}];"
+        "jsCode": "const gapData = $('Should Fill Gap?').first().json;\nconst messages = $input.all().map(i => i.json);\n\nconst conversation = messages.map(m => {\n  const content = m.message_original || m.message;\n  return `${m.role}: ${content}`;\n}).join('\\n\\n');\n\nconst prompt = `Summarize this conversation segment.\n\nConversation (${messages.length} messages):\n${conversation}\n\nJSON (no markdown):\n{\n  \"topic_title\": \"5-8 words\",\n  \"main_summary\": \"2-3 sentences\",\n  \"key_points\": [\"point 1\"]\n}`;\n\nreturn [{\n  json: {\n    context_id: gapData.context_id,\n    table_prefix: gapData.table_prefix,\n    first_message_id: messages[0].id,\n    last_message_id: messages[messages.length - 1].id,\n    message_count: messages.length,\n    summarization_prompt: prompt,\n    gap_data: gapData,\n    topic_title: 'Gap Summary'\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2650, 380],
-      "id": "code-context-002",
+      "position": [
+        -880,
+        80
+      ],
+      "id": "d2b58afd-fea4-46c1-9be5-13e465692172",
       "name": "Prepare Gap Summary"
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Create a concise summary of this conversation segment:\n\n{{ $json.gap_messages }}\n\nProvide a brief summary (2-3 sentences) covering the main points discussed.",
+        "text": "={{ $json.summarization_prompt }}",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
-      "position": [3050, 380],
-      "id": "agent-context-001",
+      "position": [
+        -480,
+        80
+      ],
+      "id": "f8fba8b1-79f9-4c50-a880-d745a1c46d8b",
       "name": "Generate Gap Summary"
     },
     {
@@ -129,13 +191,21 @@
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
-      "position": [3050, 600],
-      "id": "llm-context-001",
-      "name": "OpenAI Chat Model"
+      "position": [
+        -480,
+        304
+      ],
+      "id": "3eeb6831-451c-4059-ae0d-2ed8b5e47efd",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
     },
     {
       "parameters": {
-        "operation": "insert",
         "schema": {
           "__rl": true,
           "value": "public",
@@ -143,47 +213,73 @@
         },
         "table": {
           "__rl": true,
-          "value": "={{ $('Prepare Gap Summary').item.json.table_prefix }}topic_summary",
+          "value": "={{ $('Prepare Gap Summary').first().json.table_prefix }}chat_topic_summaries",
           "mode": "name"
         },
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "context_id": "={{ $('Prepare Gap Summary').item.json.context_id }}",
-            "topic_title": "={{ $('Prepare Gap Summary').item.json.topic_title }}",
-            "topic_summary": "={{ $input.item.json.output }}",
-            "first_message_id": "={{ $('Prepare Gap Summary').item.json.first_message_id }}",
-            "last_message_id": "={{ $('Prepare Gap Summary').item.json.last_message_id }}",
-            "message_count": "={{ $('Prepare Gap Summary').item.json.message_count }}"
+            "context_id": "={{ $('Prepare Gap Summary').first().json.context_id }}",
+            "topic_title": "={{ $('Prepare Gap Summary').first().json.topic_title }}",
+            "topic_summary": "={{ $json.output }}",
+            "first_message_id": "={{ $('Prepare Gap Summary').first().json.first_message_id }}",
+            "last_message_id": "={{ $('Prepare Gap Summary').first().json.last_message_id }}",
+            "message_count": "={{ $('Prepare Gap Summary').first().json.message_count }}"
           }
         },
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [3450, 380],
-      "id": "postgres-context-004",
-      "name": "Insert Gap Summary"
+      "position": [
+        -80,
+        80
+      ],
+      "id": "2479afa9-cca7-4c5b-b949-3fb3606668aa",
+      "name": "Insert Gap Summary",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
     },
     {
       "parameters": {},
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
-      "position": [3850, 500],
-      "id": "merge-context-002",
+      "position": [
+        336,
+        208
+      ],
+      "id": "2f2de7e2-830a-4291-9434-cce1f73f5a05",
       "name": "Merge With Gap"
     },
     {
       "parameters": {
-        "jsCode": "// Build final context JSON\nconst trigger = $('Start').first().json;\nlet dataSource;\n\n// Check if we filled a gap\nif ($('Merge With Gap').all().length > 0) {\n  dataSource = $('Merge With Gap').first().json;\n} else {\n  dataSource = $('Detect Gap').first().json;\n}\n\nconst transcriptRows = dataSource.transcript_rows || [];\nconst summaryRows = dataSource.summary_rows || [];\n\n// Format recent messages\nconst recent_messages = transcriptRows.map(r => ({\n  id: r.id,\n  role: r.role === 'assistant' ? 'assistant' : 'user',\n  content: r.message || r.message_original || '',\n  was_truncated: (r.message_original || '').length > (r.message || '').length\n}));\n\n// Format topic summaries\nconst topic_summaries = summaryRows.map(s => ({\n  topic_title: s.topic_title || '',\n  summary: s.topic_summary || '',\n  message_range: [s.first_message_id, s.last_message_id],\n  message_count: s.message_count || 0\n}));\n\n// Get long-term memories from trigger if available\nlet long_term_memories = [];\ntry {\n  if (trigger.context) {\n    const parsed = typeof trigger.context === 'string' \n      ? JSON.parse(trigger.context) \n      : trigger.context;\n    if (Array.isArray(parsed?.long_term_memories)) {\n      long_term_memories = parsed.long_term_memories;\n    }\n  }\n} catch (e) {\n  // Ignore parsing errors\n}\n\nconst context = {\n  topic_summaries,\n  recent_messages,\n  long_term_memories\n};\n\nreturn [{\n  json: {\n    context: JSON.stringify(context),\n    gap_filled: dataSource.gap_detected || false,\n    transcript_rows: transcriptRows,\n    summary_rows: summaryRows,\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix\n  }\n}];"
+        "jsCode": "// Build final context\nconst trigger = $('Start').first().json || {};\nconst inputData = $input.first().json;\n\nlet summaryRows = [];\nlet transcriptRows = [];\n\nif (inputData.gap_data) {\n  // Came from gap-filling path\n  summaryRows = inputData.gap_data.summary_rows || [];\n  transcriptRows = inputData.gap_data.transcript_rows || [];\n  \n  // Add the gap summary\n  const gapSummary = $('Prepare Gap Summary').first().json;\n  const aiOutput = $('Generate Gap Summary').first().json.output || '';\n  \n  let parsed;\n  try {\n    const cleaned = aiOutput.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n    parsed = JSON.parse(cleaned);\n  } catch {\n    parsed = { topic_title: 'Gap Summary', main_summary: aiOutput.substring(0, 200) };\n  }\n  \n  let fullSummary = `${parsed.main_summary}\\n\\n`;\n  if (parsed.key_points?.length) fullSummary += `Key: ${parsed.key_points.join('; ')}`;\n  \n  summaryRows.push({\n    topic_title: parsed.topic_title,\n    topic_summary: fullSummary.trim(),\n    first_message_id: gapSummary.first_message_id,\n    last_message_id: gapSummary.last_message_id,\n    message_count: gapSummary.message_count\n  });\n  \n  summaryRows.sort((a, b) => a.first_message_id - b.first_message_id);\n} else {\n  // No gap path\n  summaryRows = inputData.summary_rows || [];\n  transcriptRows = inputData.transcript_rows || [];\n}\n\n// Sort transcript\nconst rows = transcriptRows.sort((a, b) => {\n  const ts = v => Date.parse(v || '') || 0;\n  return ts(a.created_at || a.createdAt) - ts(b.created_at || b.createdAt);\n});\n\n// Format messages\nconst recent_messages = rows.map(r => {\n  const message = String(r.message ?? r.message_original ?? '').trim();\n  const original = String(r.message_original ?? '').trim();\n  return {\n    id: r.id,\n    role: r.role === 'assistant' ? 'assistant' : 'user',\n    content: message,\n    was_truncated: original.length > 0 && message !== original\n  };\n});\n\n// Format summaries\nconst topic_summaries = summaryRows.map(s => ({\n  topic_title: s.topic_title || '',\n  summary: s.topic_summary || '',\n  message_range: [s.first_message_id, s.last_message_id],\n  message_count: s.message_count || 0\n}));\n\n// Get memories\nlet long_term_memories = [];\ntry {\n  const triggerContext = inputData.trigger_context || trigger.context;\n  const parsed = typeof triggerContext === 'string' ? JSON.parse(triggerContext) : triggerContext;\n  if (Array.isArray(parsed?.long_term_memories)) long_term_memories = parsed.long_term_memories;\n} catch {}\n\nconst context = { topic_summaries, recent_messages, long_term_memories };\n\nreturn [{ json: { context: JSON.stringify(context) }}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4250, 500],
-      "id": "code-context-003",
+      "position": [
+        736,
+        208
+      ],
+      "id": "259452a4-13c4-4378-b8c2-5725bc756427",
       "name": "Build Final Context"
     }
   ],
+  "pinData": {
+    "Start": [
+      {
+        "json": {
+          "context_id": "michaelfY0bPv0HuPsz",
+          "table_prefix": "ura_dev_"
+        }
+      }
+    ]
+  },
   "connections": {
     "Start": {
       "main": [
@@ -328,21 +424,17 @@
           }
         ]
       ]
-    },
-    "Build Final Context": {
-      "main": [
-        [
-        ]
-      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "context-builder-v1",
+  "versionId": "0578f645-77e3-4235-bc1a-e201d94b7258",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
   },
+  "id": "qVRUx4zxcejBWFrz",
   "tags": []
 }
