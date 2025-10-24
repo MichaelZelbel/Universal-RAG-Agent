@@ -1,0 +1,259 @@
+{
+  "name": "Postgres Setup",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b57aaebc-00b6-49d5-8a4f-90ecb9246d97",
+              "name": "context_id",
+              "value": "={{ $json.userid }}{{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "588a1a2e-a5aa-4c7d-82d5-239a3cee5721",
+              "name": "table_prefix",
+              "value": "={{ $json.appname }}_{{ $json.environment }}_",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1728,
+        160
+      ],
+      "id": "42d17e61-8cae-4e3b-a7fb-6cb17bcefd78",
+      "name": "Context Keys"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9a9a245e-f1a1-4282-bb02-a81ffe629f0f",
+              "name": "chatInput",
+              "value": "={{ $json.chatInput || $json.message?.text || $json.body?.chatInput || $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "b80831d8-c653-4203-8706-adedfdb98f77",
+              "name": "sessionId",
+              "value": "={{ $json?.sessionId || $json.body.sessionId}}",
+              "type": "string"
+            },
+            {
+              "id": "b84118bf-d789-499b-87e7-f8d3b601cec8",
+              "name": "tenant",
+              "value": "=",
+              "type": "string"
+            },
+            {
+              "id": "bdacb505-6584-4518-95e8-7d5e7c20f020",
+              "name": "environment",
+              "value": "=dev",
+              "type": "string"
+            },
+            {
+              "id": "6b9472fb-1541-4684-97ec-d358fe048aad",
+              "name": "userid",
+              "value": "=  michael543525",
+              "type": "string"
+            },
+            {
+              "id": "669003c6-cc8f-4641-a58b-39a5b5306d4c",
+              "name": "appname",
+              "value": "ura",
+              "type": "string"
+            },
+            {
+              "id": "29013846-2214-4d3b-ae9e-226bb27da2c6",
+              "name": "persona",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "8c10376c-c743-4213-82a8-0bc661e2a79e",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5178ed3f-6a0d-45a0-940f-510818354a86",
+      "name": "Base Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1920,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Uncommented: Enable the pgvector extension to work with embedding vectors\n-- create extension vector;\n\n-- Create a table to store your documents\ncreate table {{ $('Context Keys').item.json.table_prefix }}documents (\n  id bigserial primary key,\n  content text, -- corresponds to Document.pageContent\n  metadata jsonb, -- corresponds to Document.metadata\n  embedding vector(1536) -- 1536 works for OpenAI embeddings, change if needed\n);\n\n-- Create a function to search for documents\ncreate function match_{{ $('Context Keys').item.json.table_prefix }}documents (\n  query_embedding vector(1536),\n  match_count int default null,\n  filter jsonb DEFAULT '{}'\n) returns table (\n  id bigint,\n  content text,\n  metadata jsonb,\n  similarity float\n)\nlanguage plpgsql\nas $$\n#variable_conflict use_column\nbegin\n  return query\n  select\n    id,\n    content,\n    metadata,\n    1 - ({{ $('Context Keys').item.json.table_prefix }}documents.embedding <=> query_embedding) as similarity\n  from {{ $('Context Keys').item.json.table_prefix }}documents\n  where metadata @> filter\n  order by {{ $('Context Keys').item.json.table_prefix }}documents.embedding <=> query_embedding\n  limit match_count;\nend;\n$$;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1232,
+        160
+      ],
+      "id": "1716ec63-9c74-4759-82ec-aa31eaa178f0",
+      "name": "Create Documents Table and Match Function",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE {{ $('Context Keys').item.json.table_prefix }}document_metadata (\n    id TEXT PRIMARY KEY,\n    title TEXT,\n    url TEXT,\n    created_at TIMESTAMP DEFAULT NOW(),\n    schema TEXT\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1008,
+        160
+      ],
+      "id": "76f92461-c63d-4921-bda2-2ba3cea8deff",
+      "name": "Create Document Metadata Table",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "CREATE TABLE {{ $('Context Keys').item.json.table_prefix }}document_rows (\n    id SERIAL PRIMARY KEY,\n    dataset_id TEXT REFERENCES {{ $('Context Keys').item.json.table_prefix }}document_metadata(id),\n    row_data JSONB  -- Store the actual row data\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -784,
+        160
+      ],
+      "id": "118d7546-16af-4393-abbe-86aac089f313",
+      "name": "Create Document Rows Table (for Tabular Data)",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- ===============================\n-- Chat Contexts (no FK anywhere)\n-- ===============================\nCREATE TABLE IF NOT EXISTS {{ $('Context Keys').item.json.table_prefix }}chat_contexts (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT UNIQUE NOT NULL,\n  context JSONB,\n  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Recreate updated_at trigger (idempotent)\nDROP TRIGGER IF EXISTS update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_contexts\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_contexts;\nDROP FUNCTION IF EXISTS update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_contexts();\n\nCREATE OR REPLACE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_contexts()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updated_at\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_contexts\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_contexts\nFOR EACH ROW\nEXECUTE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_contexts();\n\n-- ===============================\n-- Chat Transcript (no FK) - Enhanced with message tracking columns\n-- ===============================\nCREATE TABLE IF NOT EXISTS {{ $('Context Keys').item.json.table_prefix }}chat_transcript (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT NOT NULL,\n  role TEXT,\n  message TEXT,\n  message_length INTEGER,\n  message_original TEXT,\n  message_original_length INTEGER,\n  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Add new columns if table already exists (safe to run multiple times)\nDO $$\nBEGIN\n  -- Add message_length column if it doesn't exist\n  IF NOT EXISTS (\n    SELECT 1 FROM information_schema.columns \n    WHERE table_name = '{{ $('Context Keys').item.json.table_prefix }}chat_transcript' \n    AND column_name = 'message_length'\n  ) THEN\n    ALTER TABLE {{ $('Context Keys').item.json.table_prefix }}chat_transcript \n    ADD COLUMN message_length INTEGER;\n  END IF;\n\n  -- Add message_original column if it doesn't exist\n  IF NOT EXISTS (\n    SELECT 1 FROM information_schema.columns \n    WHERE table_name = '{{ $('Context Keys').item.json.table_prefix }}chat_transcript' \n    AND column_name = 'message_original'\n  ) THEN\n    ALTER TABLE {{ $('Context Keys').item.json.table_prefix }}chat_transcript \n    ADD COLUMN message_original TEXT;\n  END IF;\n\n  -- Add message_original_length column if it doesn't exist\n  IF NOT EXISTS (\n    SELECT 1 FROM information_schema.columns \n    WHERE table_name = '{{ $('Context Keys').item.json.table_prefix }}chat_transcript' \n    AND column_name = 'message_original_length'\n  ) THEN\n    ALTER TABLE {{ $('Context Keys').item.json.table_prefix }}chat_transcript \n    ADD COLUMN message_original_length INTEGER;\n  END IF;\nEND $$;\n\n-- Helpful index for lookups by context_id\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}chat_transcript_context_id\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript (context_id);\n\n-- Optional: Add index on message_length for performance if you'll be querying by message length\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}chat_transcript_message_length\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript (message_length);\n\n-- Recreate updated_at trigger (idempotent)\nDROP TRIGGER IF EXISTS update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_transcript\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript;\nDROP FUNCTION IF EXISTS update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_transcript();\n\nCREATE OR REPLACE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_transcript()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updated_at\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_transcript\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript\nFOR EACH ROW\nEXECUTE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_transcript();\n\n-- ===============================\n-- Optional: Trigger to automatically calculate message lengths\n-- ===============================\nDROP TRIGGER IF EXISTS calculate_message_lengths_{{ $('Context Keys').item.json.table_prefix }}chat_transcript\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript;\nDROP FUNCTION IF EXISTS calculate_message_lengths_{{ $('Context Keys').item.json.table_prefix }}chat_transcript();\n\nCREATE OR REPLACE FUNCTION calculate_message_lengths_{{ $('Context Keys').item.json.table_prefix }}chat_transcript()\nRETURNS TRIGGER AS $$\nBEGIN\n  -- Calculate message_length if message is provided\n  IF NEW.message IS NOT NULL THEN\n    NEW.message_length = LENGTH(NEW.message);\n  END IF;\n  \n  -- Calculate message_original_length if message_original is provided\n  IF NEW.message_original IS NOT NULL THEN\n    NEW.message_original_length = LENGTH(NEW.message_original);\n  END IF;\n  \n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER calculate_message_lengths_{{ $('Context Keys').item.json.table_prefix }}chat_transcript\nBEFORE INSERT OR UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_transcript\nFOR EACH ROW\nEXECUTE FUNCTION calculate_message_lengths_{{ $('Context Keys').item.json.table_prefix }}chat_transcript();\n\n-- ===============================\n-- Migration: Populate lengths for existing records (if any)\n-- ===============================\nUPDATE {{ $('Context Keys').item.json.table_prefix }}chat_transcript\nSET \n  message_length = LENGTH(message),\n  message_original_length = LENGTH(message_original)\nWHERE \n  (message IS NOT NULL AND message_length IS NULL)\n  OR (message_original IS NOT NULL AND message_original_length IS NULL);\n\n-- ===============================\n-- NEW: Topic Summaries Table\n-- ===============================\nCREATE TABLE IF NOT EXISTS {{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT NOT NULL,\n  topic_title TEXT NOT NULL,\n  topic_summary TEXT NOT NULL,\n  first_message_id INTEGER NOT NULL,\n  last_message_id INTEGER NOT NULL,\n  message_count INTEGER NOT NULL DEFAULT 0,\n  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Indexes for performance\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}topic_summaries_context_id\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries (context_id);\n\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}topic_summaries_messages\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries (context_id, last_message_id DESC);\n\n-- Recreate updated_at trigger (idempotent)\nDROP TRIGGER IF EXISTS update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries\n  ON {{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries;\nDROP FUNCTION IF EXISTS update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries();\n\nCREATE OR REPLACE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updated_at\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries\nFOR EACH ROW\nEXECUTE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}chat_topic_summaries();\n\n-- ===============================\n-- Topic State Table (tracks current active topic)\n-- ===============================\nCREATE TABLE IF NOT EXISTS {{ $('Context Keys').item.json.table_prefix }}topic_state (\n  context_id TEXT PRIMARY KEY,\n  current_topic_start_id INTEGER,\n  current_topic_name TEXT,\n  messages_in_current_topic INTEGER DEFAULT 0,\n  last_check_message_id INTEGER,\n  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Index for performance\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}topic_state_context_id\n  ON {{ $('Context Keys').item.json.table_prefix }}topic_state (context_id);\n\n-- Updated_at trigger\nDROP TRIGGER IF EXISTS update_timestamp_{{ $('Context Keys').item.json.table_prefix }}topic_state\n  ON {{ $('Context Keys').item.json.table_prefix }}topic_state;\nDROP FUNCTION IF EXISTS update_updated_at_{{ $('Context Keys').item.json.table_prefix }}topic_state();\n\nCREATE OR REPLACE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}topic_state()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updated_at\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}topic_state\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}topic_state\nFOR EACH ROW\nEXECUTE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}topic_state();\n\n-- ===============================\n-- NEW: Long-term Memories Table\n-- ===============================\nCREATE TABLE IF NOT EXISTS {{ $('Context Keys').item.json.table_prefix }}long_term_memories (\n  id SERIAL PRIMARY KEY,\n  context_id TEXT NOT NULL,\n  memory_type TEXT, -- preference, fact, goal, decision, person, etc.\n  content TEXT NOT NULL,\n  importance_score INTEGER DEFAULT 5, -- 1-10 scale for prioritization\n  last_referenced_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),\n  reference_count INTEGER DEFAULT 0,\n  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- Indexes for performance\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}long_term_memories_context_id\n  ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories (context_id);\n\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}long_term_memories_type\n  ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories (context_id, memory_type);\n\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}long_term_memories_importance\n  ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories (context_id, importance_score DESC);\n\n-- Full text search index on content for keyword matching\nCREATE INDEX IF NOT EXISTS idx_{{ $('Context Keys').item.json.table_prefix }}long_term_memories_content_search\n  ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories \n  USING gin(to_tsvector('english', content));\n\n-- Updated_at trigger\nDROP TRIGGER IF EXISTS update_timestamp_{{ $('Context Keys').item.json.table_prefix }}long_term_memories\n  ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories;\nDROP FUNCTION IF EXISTS update_updated_at_{{ $('Context Keys').item.json.table_prefix }}long_term_memories();\n\nCREATE OR REPLACE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}long_term_memories()\nRETURNS TRIGGER AS $$\nBEGIN\n  NEW.\"updated_at\" = timezone('utc'::text, now());\n  RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER update_timestamp_{{ $('Context Keys').item.json.table_prefix }}long_term_memories\nBEFORE UPDATE ON {{ $('Context Keys').item.json.table_prefix }}long_term_memories\nFOR EACH ROW\nEXECUTE FUNCTION update_updated_at_{{ $('Context Keys').item.json.table_prefix }}long_term_memories();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1536,
+        160
+      ],
+      "id": "75521d01-67f6-473e-81fc-9238b6b77cd5",
+      "name": "Create Chat Context & Transcript Tables",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Memory Data Table \nIf applicable, create a memory data table in n8n\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -784,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "f0615120-1262-4b08-8b4a-473e973c3d4e",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Base Context": {
+      "main": [
+        [
+          {
+            "node": "Context Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Keys": {
+      "main": [
+        [
+          {
+            "node": "Create Chat Context & Transcript Tables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Documents Table and Match Function": {
+      "main": [
+        [
+          {
+            "node": "Create Document Metadata Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Metadata Table": {
+      "main": [
+        [
+          {
+            "node": "Create Document Rows Table (for Tabular Data)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Document Rows Table (for Tabular Data)": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9d339b0b-ef64-4352-b728-9423ac52412f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
+  },
+  "id": "twcETqhjbKalJ9lY",
+  "tags": []
+}
