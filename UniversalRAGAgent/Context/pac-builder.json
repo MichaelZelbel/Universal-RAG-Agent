@@ -1,5 +1,5 @@
 {
-  "name": "Table Memory Chat Bot Process On one Page",
+  "name": "PAC Builder",
   "nodes": [
     {
       "parameters": {
@@ -10,10 +10,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -1952,
-        336
+        688,
+        -80
       ],
-      "id": "e356af20-82bd-4df0-b1ce-5c6a868f110a",
+      "id": "acad580d-9772-4f81-af4a-29356b59dc70",
       "name": "Memory Manager"
     },
     {
@@ -23,10 +23,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        128,
-        240
+        4512,
+        -64
       ],
-      "id": "1cc5f51f-03ff-456b-bfe9-913957d4fe4b",
+      "id": "a39e126b-decf-496b-88d5-1ecdbb57d931",
       "name": "Build Next Context"
     },
     {
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1600,
-        336
+        1040,
+        -80
       ],
-      "id": "02605045-7a6d-4040-9734-d51f8b6d6827",
+      "id": "0f0e0f4f-b7ad-4726-aedd-592f7d28cdd8",
       "name": "Prepare Messages"
     },
     {
@@ -56,10 +56,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        -1392,
-        336
+        1248,
+        -80
       ],
-      "id": "0a0c3ed7-8440-448a-80f0-fe22a74e7b66",
+      "id": "6c273dac-5d5a-4cb6-a6c4-150b63b0ea7e",
       "name": "Check If Summary Needed"
     },
     {
@@ -71,10 +71,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        -1184,
-        144
+        1456,
+        -272
       ],
-      "id": "4469dee2-ad4e-41be-9213-d4cb5efb13ee",
+      "id": "c7d622cd-af96-487e-81fc-87656ec03808",
       "name": "Summarize Long Message"
     },
     {
@@ -84,10 +84,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -880,
-        144
+        1760,
+        -272
       ],
-      "id": "69955b45-68b0-4bac-a9f0-6f8c160edaf6",
+      "id": "ff4bf0c2-f6f0-42fb-a201-548ccbe84613",
       "name": "Combine Message with Summary"
     },
     {
@@ -98,10 +98,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -880,
-        352
+        1760,
+        -64
       ],
-      "id": "4a8924a3-1a65-4f29-bf41-f7b83c789b01",
+      "id": "c513ccbf-9117-43c6-a46a-d4167a799970",
       "name": "Use Original Message"
     },
     {
@@ -109,10 +109,10 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2.1,
       "position": [
-        -672,
-        336
+        1968,
+        -80
       ],
-      "id": "aaea037d-4592-44cb-ab0c-f69d465999f6",
+      "id": "ace46793-a99c-4f3e-87cf-68805a1f36c3",
       "name": "Merge Messages"
     },
     {
@@ -128,10 +128,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -1952,
-        560
+        688,
+        160
       ],
-      "id": "40e06394-a76d-4cfa-a8cb-438fbf0e80cc",
+      "id": "ef15db6d-f0fa-4745-8a43-629551666853",
       "name": "OpenAI Chat Model1",
       "credentials": {
         "openAiApi": {
@@ -153,10 +153,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        -1184,
-        288
+        1456,
+        -128
       ],
-      "id": "d14bf263-7fd1-4c8c-8704-52ce70eca96d",
+      "id": "a19fcfda-a3bb-4fd3-835e-c7650a2719cd",
       "name": "OpenAI Chat Model2",
       "credentials": {
         "openAiApi": {
@@ -167,31 +167,17 @@
     },
     {
       "parameters": {
-        "inputSource": "jsonExample",
-        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great! Fishing is a wonderful hobby...\",\n  \"context\": \"{\\\"recent_messages\\\":[{\\\"id\\\":1,\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello\\\",\\\"was_truncated\\\":false},{\\\"id\\\":2,\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"hi there\\\",\\\"was_truncated\\\":false}],\\\"long_term_memories\\\":[{\\\"type\\\":\\\"preference\\\",\\\"content\\\":\\\"User likes fishing\\\"}]}\"\n}"
-      },
-      "type": "n8n-nodes-base.executeWorkflowTrigger",
-      "typeVersion": 1.1,
-      "position": [
-        -2160,
-        336
-      ],
-      "id": "bce86762-035e-44ed-b847-e0fa507e8b69",
-      "name": "Start"
-    },
-    {
-      "parameters": {
         "content": "Fixed Message Processing:\n- Messages > 5000 chars get truncated + AI summary\n- Original stored in message_original\n- Processed version in message column\n- Context data properly passed through all nodes\n- Fixed item pairing issues after merge\n\nENHANCEMENT:\n- Each message in context now includes database ID\n- Added 'was_truncated' flag to indicate if full message is in DB\n- Agent can retrieve original messages using ID when needed",
         "height": 240,
         "width": 350
       },
       "type": "n8n-nodes-base.stickyNote",
       "position": [
-        -1600,
-        16
+        1040,
+        -400
       ],
       "typeVersion": 1,
-      "id": "b554ccd8-c4bc-4208-a2a4-2d72ab4c2efd",
+      "id": "41f363df-5581-47bd-97d2-d4d1a1864554",
       "name": "Sticky Note"
     },
     {
@@ -203,10 +189,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -480,
-        336
+        2160,
+        -80
       ],
-      "id": "49f1d8f8-9b18-4276-9960-b1944f97490a",
+      "id": "1ea58ca5-a405-4532-900e-d83445f09e0a",
       "name": "Insert Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -225,10 +211,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -288,
-        240
+        2352,
+        -80
       ],
-      "id": "fe915ace-17b9-476c-9391-675ec712ff11",
+      "id": "2fb2682a-f4d6-49ce-b3f4-a1a95f3379c6",
       "name": "Fetch Transcript",
       "alwaysOutputData": true,
       "credentials": {
@@ -247,10 +233,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -64,
-        240
+        2576,
+        -80
       ],
-      "id": "921d7fe3-e114-4f56-bf63-6ba55dc131da",
+      "id": "5a89cf5c-e6e2-4210-b965-b74d191946c3",
       "name": "Fetch Topic Summaries",
       "alwaysOutputData": true,
       "credentials": {
@@ -269,10 +255,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        320,
-        240
+        4704,
+        -64
       ],
-      "id": "5b2e2f44-da75-4f08-bf0c-27f5e69685d2",
+      "id": "cfd97c48-9580-4f78-9e86-fb0982564930",
       "name": "Upsert Context",
       "alwaysOutputData": true,
       "credentials": {
@@ -293,10 +279,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -288,
-        464
+        2352,
+        128
       ],
-      "id": "b84e2e72-6e52-4b5f-bc6a-abc7cf2fb04d",
+      "id": "af362f0b-badc-4ac9-a7f0-d6531e91c551",
       "name": "Fetch Recent for Detection",
       "alwaysOutputData": true,
       "credentials": {
@@ -315,10 +301,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        128,
-        464
+        2768,
+        128
       ],
-      "id": "dd14a5e1-40cb-4cd7-99c6-780d40b98b95",
+      "id": "f5cd3045-1256-4424-9a33-16960fe0d44a",
       "name": "Detect Topic Shift"
     },
     {
@@ -328,10 +314,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        464
+        3056,
+        128
       ],
-      "id": "ad4818d9-1937-4925-8e95-27fc4d8e5786",
+      "id": "747e13b4-9820-45a5-aee8-3ad9029600f8",
       "name": "Log Detection Result"
     },
     {
@@ -347,10 +333,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        128,
-        672
+        2768,
+        336
       ],
-      "id": "31d60781-199c-4522-a715-0f5f6dfc9207",
+      "id": "f7b3a218-28f5-4f20-8fcd-e8efe87be1b6",
       "name": "OpenAI Chat Model",
       "credentials": {
         "openAiApi": {
@@ -366,10 +352,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -64,
-        464
+        2576,
+        128
       ],
-      "id": "e8cbc25d-a67b-4a5c-a991-397935f7a18f",
+      "id": "73992140-967a-4976-bf84-ea476ae89f26",
       "name": "Prepare Detection Data"
     },
     {
@@ -381,10 +367,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        608,
-        464
+        3248,
+        128
       ],
-      "id": "3e007e76-b804-42de-9700-38114d29952f",
+      "id": "8ea41e1a-8282-479d-8739-e7f82eaeb866",
       "name": "Update Topic State",
       "alwaysOutputData": true,
       "credentials": {
@@ -427,10 +413,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        816,
-        464
+        3456,
+        128
       ],
-      "id": "a33905f6-c70c-4607-b2ab-ee42539c6afb",
+      "id": "416753cd-b807-4439-9656-0e6e52920895",
       "name": "Should Create Summary?"
     },
     {
@@ -442,10 +428,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1056,
-        448
+        3696,
+        112
       ],
-      "id": "6418b848-c0aa-4827-9781-c0dde2422038",
+      "id": "b677c853-992c-4c23-9508-aa642778a9b3",
       "name": "Fetch Topic Messages",
       "alwaysOutputData": true,
       "credentials": {
@@ -462,10 +448,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1264,
-        448
+        3904,
+        112
       ],
-      "id": "3602945a-8021-405b-bd68-934a7c50a8ec",
+      "id": "5b3c200e-aada-4876-97f7-92a099b2ae55",
       "name": "Prepare Summarization"
     },
     {
@@ -477,10 +463,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        1456,
-        448
+        4096,
+        112
       ],
-      "id": "a3608136-c74c-48fc-8c33-1253d44969eb",
+      "id": "83be52c0-a01b-4a35-8c98-cbb40dbe1b8a",
       "name": "Generate Summary"
     },
     {
@@ -490,10 +476,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        448
+        4400,
+        112
       ],
-      "id": "1f0670a4-3589-409f-a2fa-14aec779a4a7",
+      "id": "bb88ca8a-d0f0-43e8-afcb-1bc847dabf83",
       "name": "Format Summary"
     },
     {
@@ -505,10 +491,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1952,
-        448
+        4592,
+        112
       ],
-      "id": "6a5894d6-a6df-4cb9-9d65-bf80cbe2f8e8",
+      "id": "b3bb807f-f54a-4a12-8ab1-7ee948c3faae",
       "name": "Insert Summary",
       "alwaysOutputData": true,
       "credentials": {
@@ -530,10 +516,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        1456,
-        608
+        4096,
+        304
       ],
-      "id": "f34a63b6-19c9-4172-a48c-dc4f06fa7ef7",
+      "id": "e39b6ff3-3b6f-4b4a-a4f6-286ad1659517",
       "name": "OpenAI Chat Model3",
       "credentials": {
         "openAiApi": {
@@ -549,10 +535,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1216,
-        240
+        2768,
+        -80
       ],
-      "id": "69ff48cf-9884-4bd7-a5c6-a56035541cdf",
+      "id": "3b62e171-c629-45ab-8726-0763ffbc1fe2",
       "name": "Detect Gap"
     },
     {
@@ -580,10 +566,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1408,
-        240
+        2960,
+        -80
       ],
-      "id": "31e11808-97c2-4a02-b78b-c2d5edd25559",
+      "id": "d692de5f-b90c-4b09-a01c-8bc3784c760d",
       "name": "Should Fill Gap?"
     },
     {
@@ -595,10 +581,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1632,
-        32
+        3184,
+        -288
       ],
-      "id": "4c7c8332-d29e-4315-b90b-7f5160afbbd3",
+      "id": "2d17b08b-c547-45b4-ae24-036c2af11399",
       "name": "Fetch Gap Messages",
       "alwaysOutputData": true,
       "credentials": {
@@ -615,10 +601,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1808,
-        32
+        3360,
+        -288
       ],
-      "id": "dccdbfa8-0423-49e0-bc95-faee19f45ad4",
+      "id": "6599666d-29f0-46f8-9a8a-0562e972dd6c",
       "name": "Prepare Gap Summary"
     },
     {
@@ -630,10 +616,10 @@
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.2,
       "position": [
-        2016,
-        32
+        3568,
+        -288
       ],
-      "id": "bf00cec6-7e72-4bd8-b53a-e2aafaca13b6",
+      "id": "dbc032cf-eb5a-4c05-b94d-6e527dc25c84",
       "name": "Generate Gap Summary"
     },
     {
@@ -643,10 +629,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2384,
-        32
+        3936,
+        -288
       ],
-      "id": "0a79afda-1712-4961-b041-177ffae19927",
+      "id": "15495fd4-094f-4317-9034-b63e6f299755",
       "name": "Format Gap Summary"
     },
     {
@@ -658,10 +644,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2592,
-        32
+        4144,
+        -288
       ],
-      "id": "82b89ee2-7f60-43cb-90e1-66da4a98e1ea",
+      "id": "3bf5e998-0ad8-4ed2-9ebd-fc09d18fcfb0",
       "name": "Insert Gap Summary",
       "alwaysOutputData": true,
       "credentials": {
@@ -678,10 +664,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2768,
-        256
+        4320,
+        -64
       ],
-      "id": "e58468e0-60a8-445a-ac17-fc92cdd847d8",
+      "id": "9ae85a3a-73b5-467e-a583-746068a8109f",
       "name": "Merge Gap Summary"
     },
     {
@@ -696,10 +682,10 @@
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.2,
       "position": [
-        2016,
-        176
+        3568,
+        -144
       ],
-      "id": "20993f9d-04a9-4e53-9540-056d613f04c2",
+      "id": "3c4999b5-6556-4cf6-8175-3be7621e822d",
       "name": "OpenAI Chat Model4",
       "credentials": {
         "openAiApi": {
@@ -707,6 +693,125 @@
           "name": "OpenAi account"
         }
       }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        160,
+        144
+      ],
+      "id": "6e80b654-11a8-4fcf-8a1d-5e2ad6727e94",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"823f85559ab443eeabb3887ead1db47b\",\n  \"table_prefix\": \"ura_dev_\",\n  \"userMessage\": \"I like fishing\",\n  \"assistantResponse\": \"That's great! Fishing is a wonderful hobby...\",\n  \"context\": \"{\\\"recent_messages\\\":[{\\\"id\\\":1,\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello\\\",\\\"was_truncated\\\":false},{\\\"id\\\":2,\\\"role\\\":\\\"assistant\\\",\\\"content\\\":\\\"hi there\\\",\\\"was_truncated\\\":false}],\\\"long_term_memories\\\":[{\\\"type\\\":\\\"preference\\\",\\\"content\\\":\\\"User likes fishing\\\"}]}\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        -80
+      ],
+      "id": "f9528f43-2883-49ec-9d60-ed74c71a703b",
+      "name": "Entry"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0eec5cdd-dd64-4e0a-aa6f-9c50e2c7c878",
+              "name": "=context_id",
+              "value": "{{ $json.context_id }}",
+              "type": "string"
+            },
+            {
+              "id": "79c75c46-1abf-47a7-abe7-373f57b478a0",
+              "name": "=table_prefix",
+              "value": "={{ $json.table_prefix }}",
+              "type": "string"
+            },
+            {
+              "id": "5ba76ac2-3f1c-48ab-8770-567267ca2f71",
+              "name": "userMessage",
+              "value": "={{ $json.userMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "cb2f476d-0726-4a7a-95a8-42a9e6630428",
+              "name": "assistantResponse",
+              "value": "={{ $json.assistantResponse }}",
+              "type": "string"
+            },
+            {
+              "id": "638351b1-eaa8-4bdd-8ecb-fbcebc1ec1c1",
+              "name": "context",
+              "value": "={{ $json.context }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        528,
+        -80
+      ],
+      "id": "6fdc471c-37c9-409b-9ab9-d885823b2f74",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0eec5cdd-dd64-4e0a-aa6f-9c50e2c7c878",
+              "name": "context_id",
+              "value": "michaelfY0bPv0HuPsz",
+              "type": "string"
+            },
+            {
+              "id": "79c75c46-1abf-47a7-abe7-373f57b478a0",
+              "name": "table_prefix",
+              "value": "ura_dev_",
+              "type": "string"
+            },
+            {
+              "id": "5ba76ac2-3f1c-48ab-8770-567267ca2f71",
+              "name": "userMessage",
+              "value": "My cat is sneezing sometimes.",
+              "type": "string"
+            },
+            {
+              "id": "cb2f476d-0726-4a7a-95a8-42a9e6630428",
+              "name": "assistantResponse",
+              "value": "I'm sorry to hear your cat is sneezing.",
+              "type": "string"
+            },
+            {
+              "id": "638351b1-eaa8-4bdd-8ecb-fbcebc1ec1c1",
+              "name": "context",
+              "value": "={\"recent_messages\":[{\"id\":135,\"role\":\"user\",\"content\":\"Hahahah, no, I love my cat, but I would not like to drink from the same glass.\",\"was_truncated\":false},{\"id\":136,\"role\":\"assistant\",\"content\":\"That’s totally understandable! Cats have their own unique way of sharing space, but some boundaries like the glass are definitely good to keep. Does your cat try to sneak a sip sometimes?\",\"was_truncated\":false},{\"id\":138,\"role\":\"assistant\",\"content\":\"Cats do have a knack for getting into everything, especially glasses of water! It sounds like your cat is quite curious and thirsty. Maybe you could try giving your cat its own water bowl nearby—that way, it might be less interested in your glass. Do you already have a favorite spot for your cat’s water?\",\"was_truncated\":false},{\"id\":137,\"role\":\"user\",\"content\":\"Yes, since I got the cat I have to cover my glas. Otherwise it would drink from my glas the very moment that I don't pay attention\",\"was_truncated\":false},{\"id\":139,\"role\":\"user\",\"content\":\"Yes, there is actually just one spot that the cat likes her water. It's in my living room.\",\"was_truncated\":false},{\"id\":140,\"role\":\"assistant\",\"content\":\"That's adorable! Cats can be quite particular about their water spots. Do you have a special bowl or fountain there that she prefers? Sometimes the location, water freshness, or even the type of bowl can make a big difference for them.\",\"was_truncated\":false},{\"id\":141,\"role\":\"user\",\"content\":\"Yes, my cat will only accept to drink water from a big drinking glas.\",\"was_truncated\":false},{\"id\":142,\"role\":\"assistant\",\"content\":\"That's quite interesting! Cats can be quite particular about their water sources. Using a big drinking glass sounds like a simple solution. Just make sure the glass is clean and filled with fresh water regularly. If you want, I can also suggest some tips to encourage your cat to drink more water or make sure the water stays fresh longer. Would you like that?\",\"was_truncated\":false},{\"id\":143,\"role\":\"user\",\"content\":\"I always think about giving my cat fresh water. I don't forget that.\",\"was_truncated\":false},{\"id\":144,\"role\":\"assistant\",\"content\":\"That's wonderful! Making sure your cat always has fresh water is very important for their health. If you'd like, I can help you set reminders or suggest ways to keep the water fresh and appealing for your cat. Would you like some tips?\",\"was_truncated\":false}],\"topic_summaries\":[{\"summary\":\"{\\n  \\\"topic_title\\\": \\\"Cat's Unique Preferences and Care\\\",\\n  \\\"main_summary\\\": \\\"The user shares how their cat enjoys being brushed, especially on the back and under the chin, which makes it purr loudly. Additionally, the cat prefers drinking water from glasses rather than pet-specific bowls. The conversation highlights the importance of catering to the cat's individual preferences for its comfort and health.\\\",\\n  \\\"key_points\\\": [\\n    \\\"Cat enjoys being brushed and tickled, showing signs of happiness like purring.\\\",\\n    \\\"Cat prefers drinking from glasses over fountains or bowls.\\\"\\n  ]\\n}\",\"topic_title\":\"Gap Summary\",\"message_count\":10,\"message_range\":[125,134]},{\"summary\":\"The user describes their cat as an affectionate cuddler who enjoys crawling under their jumper. The assistant provides safety tips for playing with cats, including avoiding scratches, toxic objects, and overstimulation.\\n\\nKey Points: Cat likes to cuddle and hide under clothing; Playing safely involves preventing scratches, choking hazards, and overstimulation\",\"topic_title\":\"Cat cuddling and safe play tips\",\"message_count\":8,\"message_range\":[117,124]},{\"summary\":\"The conversation discusses Amazon's special sale events such as Prime Day, Black Friday, and Cyber Monday, highlighting opportunities to purchase discounted Christmas gifts. It also covers the possibility of using Amazon's gift wrapping and direct delivery services to send presents conveniently. Assistance was offered to find deals and information on gift services.\\n\\nKey Points: Amazon holds special sales including Prime Day, Black Friday, and Cyber Monday.; These events are ideal for buying discounted holiday gifts.; Amazon provides gift wrapping and direct delivery options.\\nActions: Assist user in finding current Amazon deals and gift options\",\"topic_title\":\"Amazon special sales and gift options\",\"message_count\":6,\"message_range\":[111,116]},{\"summary\":\"The user remembered to refuel their car and discussed the importance of avoiding running out of gas, especially on the highway. They highlighted how modern technology, like fuel monitoring in BMW cars and smartphone apps, simplifies managing fuel levels and enhances driving safety.\\n\\nKey Points: Running out of gas on the highway is dangerous and stressful; Modern cars provide effective fuel level monitoring; BMW app offers convenient real-time fuel data\\nActions: Fill up the car with gas today\",\"topic_title\":\"Car Fuel Management and Technology\",\"message_count\":6,\"message_range\":[103,108]}],\"long_term_memories\":[]}\\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        336,
+        144
+      ],
+      "id": "d39418cd-3dd8-4491-bfdd-da89df415424",
+      "name": "Test Values"
     }
   ],
   "pinData": {},
@@ -722,33 +827,11 @@
         ]
       ]
     },
-    "OpenAI Chat Model1": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Memory Manager",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Chat Model2": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Summarize Long Message",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Start": {
+    "Build Next Context": {
       "main": [
         [
           {
-            "node": "Memory Manager",
+            "node": "Upsert Context",
             "type": "main",
             "index": 0
           }
@@ -828,12 +911,23 @@
         ]
       ]
     },
-    "Build Next Context": {
-      "main": [
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
         [
           {
-            "node": "Upsert Context",
-            "type": "main",
+            "node": "Memory Manager",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarize Long Message",
+            "type": "ai_languageModel",
             "index": 0
           }
         ]
@@ -899,6 +993,17 @@
         ]
       ]
     },
+    "Log Detection Result": {
+      "main": [
+        [
+          {
+            "node": "Update Topic State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "OpenAI Chat Model": {
       "ai_languageModel": [
         [
@@ -915,17 +1020,6 @@
         [
           {
             "node": "Detect Topic Shift",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Log Detection Result": {
-      "main": [
-        [
-          {
-            "node": "Update Topic State",
             "type": "main",
             "index": 0
           }
@@ -1114,17 +1208,61 @@
           }
         ]
       ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Test Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entry": {
+      "main": [
+        [
+          {
+            "node": "Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Memory Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Values": {
+      "main": [
+        [
+          {
+            "node": "Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "de610210-ea7c-45b4-98b6-2eeaf1a86f1d",
+  "versionId": "996f43b6-a724-4af5-8a2c-36f8c5781af7",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "7ac72ab13b8f564b4e52fe865fd322b93ff4a198e7d01a343aa643a3d940b098"
   },
-  "id": "uEDqZ2AUeG8imAYK",
+  "id": "e7XF3f8ZZCeSZyw0",
   "tags": []
 }
