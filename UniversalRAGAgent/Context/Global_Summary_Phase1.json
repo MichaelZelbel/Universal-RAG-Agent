@@ -1,0 +1,219 @@
+{
+  "name": "Global Summary Nodes - Phase 1",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\n  \"context_id\": \"test123\",\n  \"table_prefix\": \"ura_dev_\"\n}"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "id": "start-node",
+      "name": "Start"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as total_messages,\n       COALESCE(MAX(gs.last_update_message_id), 0) as last_update_id\nFROM {{ $('Start').first().json.table_prefix }}chat_transcript t\nLEFT JOIN {{ $('Start').first().json.table_prefix }}global_summary gs \n  ON gs.context_id = t.context_id\nWHERE t.context_id = '{{ $('Start').first().json.context_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [460, 300],
+      "id": "check-update-needed",
+      "name": "Check Update Needed",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Start').first().json;\nconst checkData = $json;\n\nconst totalMessages = parseInt(checkData.total_messages) || 0;\nconst lastUpdateId = parseInt(checkData.last_update_id) || 0;\n\nconst messagesSinceUpdate = totalMessages - lastUpdateId;\nconst shouldUpdate = messagesSinceUpdate >= 15;\n\nconsole.log('=== GLOBAL SUMMARY CHECK ===');\nconsole.log('Total messages:', totalMessages);\nconsole.log('Last update at message:', lastUpdateId);\nconsole.log('Messages since update:', messagesSinceUpdate);\nconsole.log('Should update:', shouldUpdate);\nconsole.log('===========================');\n\nreturn [{\n  json: {\n    context_id: trigger.context_id,\n    table_prefix: trigger.table_prefix,\n    should_update: shouldUpdate,\n    total_messages: totalMessages,\n    last_update_id: lastUpdateId,\n    messages_since_update: messagesSinceUpdate\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "id": "evaluate-update",
+      "name": "Evaluate Update"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_update }}",
+              "rightValue": true,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "id": "should-update",
+      "name": "Should Update?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT summary, last_update_message_id\nFROM {{ $('Evaluate Update').first().json.table_prefix }}global_summary\nWHERE context_id = '{{ $('Evaluate Update').first().json.context_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1120, 200],
+      "id": "fetch-current-summary",
+      "name": "Fetch Current Summary",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT topic_title, topic_summary, first_message_id, last_message_id\nFROM {{ $('Evaluate Update').first().json.table_prefix }}chat_topic_summaries\nWHERE context_id = '{{ $('Evaluate Update').first().json.context_id }}'\n  AND last_message_id > {{ $('Evaluate Update').first().json.last_update_id }}\nORDER BY first_message_id ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1120, 300],
+      "id": "fetch-new-summaries",
+      "name": "Fetch New Topic Summaries",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1340, 250],
+      "id": "merge-summary-data",
+      "name": "Merge Summary Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const evalData = $('Evaluate Update').first().json;\nconst currentSummaryRows = $('Fetch Current Summary').all().map(i => i.json);\nconst newTopicRows = $('Fetch New Topic Summaries').all().map(i => i.json);\n\nconst currentSummary = currentSummaryRows.length > 0 \n  ? currentSummaryRows[0].summary \n  : 'No previous summary exists. This is the start of the conversation.';\n\nconst newDevelopments = newTopicRows.length > 0\n  ? newTopicRows.map(t => `**${t.topic_title}**: ${t.topic_summary}`).join('\\n\\n')\n  : 'No new topic summaries since last update.';\n\nconst prompt = `Update this global conversation summary with new information.\n\nCURRENT GLOBAL SUMMARY:\n${currentSummary}\n\nNEW DEVELOPMENTS (since last update):\n${newDevelopments}\n\nCreate an updated global summary (max 400 words) that:\n- Maintains key facts and preferences from current summary\n- Incorporates new information from developments\n- Removes outdated or contradicted information\n- Stays concise and scannable\n- Uses clear, natural language\n\nProvide ONLY the updated summary text (no JSON, no extra formatting).`;\n\nreturn [{\n  json: {\n    context_id: evalData.context_id,\n    table_prefix: evalData.table_prefix,\n    total_messages: evalData.total_messages,\n    prompt: prompt\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 250],
+      "id": "prepare-update-prompt",
+      "name": "Prepare Update Prompt"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [1780, 250],
+      "id": "generate-summary",
+      "name": "Generate Global Summary"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1780, 450],
+      "id": "openai-model",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ypHiVnbB3jkc0yAx",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO {{ $('Prepare Update Prompt').first().json.table_prefix }}global_summary\n(context_id, summary, last_update_message_id, message_count)\nVALUES (\n  '{{ $('Prepare Update Prompt').first().json.context_id }}',\n  '{{ String($json.output || \"\").replace(/'/g, \"''\") }}',\n  {{ $('Prepare Update Prompt').first().json.total_messages }},\n  {{ $('Prepare Update Prompt').first().json.total_messages }}\n)\nON CONFLICT (context_id) DO UPDATE SET\n  summary = EXCLUDED.summary,\n  last_update_message_id = EXCLUDED.last_update_message_id,\n  message_count = EXCLUDED.message_count,\n  updated_at = timezone('utc'::text, now());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2000, 250],
+      "id": "upsert-summary",
+      "name": "Upsert Global Summary",
+      "credentials": {
+        "postgres": {
+          "id": "p1yb7OdsllaTAj7J",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [[{"node": "Check Update Needed", "type": "main", "index": 0}]]
+    },
+    "Check Update Needed": {
+      "main": [[{"node": "Evaluate Update", "type": "main", "index": 0}]]
+    },
+    "Evaluate Update": {
+      "main": [[{"node": "Should Update?", "type": "main", "index": 0}]]
+    },
+    "Should Update?": {
+      "main": [
+        [
+          {"node": "Fetch Current Summary", "type": "main", "index": 0},
+          {"node": "Fetch New Topic Summaries", "type": "main", "index": 0}
+        ],
+        []
+      ]
+    },
+    "Fetch Current Summary": {
+      "main": [[{"node": "Merge Summary Data", "type": "main", "index": 0}]]
+    },
+    "Fetch New Topic Summaries": {
+      "main": [[{"node": "Merge Summary Data", "type": "main", "index": 1}]]
+    },
+    "Merge Summary Data": {
+      "main": [[{"node": "Prepare Update Prompt", "type": "main", "index": 0}]]
+    },
+    "Prepare Update Prompt": {
+      "main": [[{"node": "Generate Global Summary", "type": "main", "index": 0}]]
+    },
+    "Generate Global Summary": {
+      "main": [[{"node": "Upsert Global Summary", "type": "main", "index": 0}]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{"node": "Generate Global Summary", "type": "ai_languageModel", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
